@@ -1,6 +1,7 @@
 from numpy import array
 
-from domain.pieces import Bishop, Piece, Rook
+from domain.pieces.piece import Piece
+from domain.pieces.rook import Rook
 
 
 class Game:
