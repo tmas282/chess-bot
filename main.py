@@ -1,12 +1,15 @@
+import sys
+
 import chess
 
 from minimax import evaluate_positions
 
 if __name__ == "__main__":
+    sys.setrecursionlimit(10_000_000)
     board = chess.Board()
     while board.outcome() is None:
         print("Bot playing...")
-        board.push(evaluate_positions(board.fen(), 5))
+        board.push(evaluate_positions(board.fen(), 7))
         print(f"Bot played. Current FEN: {board.fen()}")
         legal_moves = board.legal_moves
         mv = input("Your move: ")
