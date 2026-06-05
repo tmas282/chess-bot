@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader, Dataset
 from torch import nn
 from torch.utils.tensorboard.writer import SummaryWriter
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import MinMaxScaler
 
 class ChessHeuristicDataset(Dataset):
     def __init__(self, features, targets):
@@ -28,13 +28,15 @@ class ChessHeuristicEvaluator(nn.Module):
         super().__init__(*args, **kwargs)
         self.flat = nn.Flatten()
         self.heuristic = nn.Sequential(
-            nn.Linear(69 * 1, 256),
+            nn.Linear(68 * 1, 256),
             nn.ReLU(),
-            nn.Linear(256, 256),
+            nn.Linear(256, 128),
             nn.ReLU(),
-            nn.Linear(256, 64),
+            nn.Linear(128, 64),
             nn.ReLU(),
-            nn.Linear(64, 1)
+            nn.Linear(64, 32),
+            nn.ReLU(),
+            nn.Linear(32, 1)
         )
     def forward(self, x):
         x = self.flat(x)
@@ -42,20 +44,17 @@ class ChessHeuristicEvaluator(nn.Module):
         return logits
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(DEVICE)
 model = ChessHeuristicEvaluator().to(DEVICE)
-EPOCHS = 5
-SCALER = StandardScaler()
+EPOCHS = 10
+SCALER = MinMaxScaler()
 OPTIMIZER = torch.optim.Adam(model.parameters())
-LOSS_FN = torch.nn.L1Loss()
+LOSS_FN = torch.nn.MSELoss()
 PATH = "chess_heuristic_evaluator"
 
 def pre_process_df(df: pandas.DataFrame):
-    df = df.head(n=100)
-    df["eval"] = df["Evaluation"].apply(parse_evaluation)
-    df = df.drop(columns=["Evaluation"])
+    df["Evaluation"] = df["Evaluation"].apply(parse_evaluation)
     X = convert_fens_to_arrays(df["FEN"])
-    y = df["eval"].to_numpy()
+    y = df["Evaluation"].to_numpy()
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
@@ -71,10 +70,15 @@ def pre_process_df(df: pandas.DataFrame):
 
 def parse_evaluation(eval: str) -> np.ndarray:
     if(eval.startswith("#+")):
-        return np.array(100_000, dtype=np.int32)
+        return np.array(10_000, dtype=np.int32)
     if(eval.startswith("#-")):
-        return np.array(-100_000, dtype=np.int32)
-    return np.array(eval, dtype=np.int32)
+        return np.array(-10_000, dtype=np.int32)
+    eval_v = np.array(eval, dtype=np.int32)
+    if(eval_v < -10_000):
+        return np.array(-10_000, dtype=np.int32)
+    if(eval_v > 10_000):
+        return np.array(10_000, dtype=np.int32)
+    return eval_v
 
 def convert_fens_to_arrays(s: pandas.Series) -> np.ndarray:
     vec = np.vectorize(fen_to_integer_array, signature="()->(n)")
@@ -117,11 +121,9 @@ def fen_to_integer_array(board_fen: str) -> np.ndarray:
         elif( i == '.'):
             arr.append(0)
     
-    is_white = 1 if fen_parts[1] == "w" else 0
     can_castle = [1 if "K" in fen_parts[2] else 0, 1 if "Q" in fen_parts[2] else 0,
                   1 if "k" in fen_parts[2] else 0, 1 if "q" in fen_parts[2] else 0]
 
-    arr.append(is_white)
     arr.extend(can_castle)
     return np.array(arr, dtype=np.int8)
 
@@ -164,8 +166,6 @@ def train(train_dl: "DataLoader", test_dl: "DataLoader"):
     # Initializing in a separate cell so we can easily add more epochs to the same run
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     writer = SummaryWriter(f'runs/ChessHeuristicEvaluator_train_{timestamp}')
-
-    EPOCHS = 5
 
     best_vloss = 1_000_000.
 
@@ -214,6 +214,7 @@ def start_training():
     train(train_dl, test_dl)
 
 if __name__ == "__main__":
+    print(DEVICE)
     start_training()
 
 def use_model():
