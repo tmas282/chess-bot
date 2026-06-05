@@ -5,7 +5,7 @@ import numpy as np
 import pandas
 import torch
 import os
-import datetime
+from datetime import datetime
 from torch.utils.data import DataLoader, Dataset
 from torch import nn
 from torch.utils.tensorboard.writer import SummaryWriter
@@ -14,8 +14,8 @@ from sklearn.preprocessing import StandardScaler
 
 class ChessHeuristicDataset(Dataset):
     def __init__(self, features, targets):
-        self.X = torch.tensor(features.values, dtype=torch.float).to(DEVICE)
-        self.y = torch.tensor(targets.values, dtype=torch.float).view(-1, 1).to(DEVICE)
+        self.X = torch.tensor(features, dtype=torch.float).to(DEVICE)
+        self.y = torch.tensor(targets, dtype=torch.float).view(-1, 1).to(DEVICE)
  
     def __len__(self):
         return len(self.X)
@@ -28,13 +28,11 @@ class ChessHeuristicEvaluator(nn.Module):
         super().__init__(*args, **kwargs)
         self.flat = nn.Flatten()
         self.heuristic = nn.Sequential(
-            nn.Linear(69 * 1, 512),
+            nn.Linear(69 * 1, 256),
             nn.ReLU(),
-            nn.Linear(512, 512),
+            nn.Linear(256, 256),
             nn.ReLU(),
-            nn.Linear(512, 256),
-            nn.ReLU(),
-            nn.Linear(256,64),
+            nn.Linear(256, 64),
             nn.ReLU(),
             nn.Linear(64, 1)
         )
@@ -44,26 +42,25 @@ class ChessHeuristicEvaluator(nn.Module):
         return logits
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(DEVICE)
 model = ChessHeuristicEvaluator().to(DEVICE)
 EPOCHS = 5
+SCALER = StandardScaler()
 OPTIMIZER = torch.optim.Adam(model.parameters())
-LOSS_FN = torch.nn.MSELoss()
+LOSS_FN = torch.nn.L1Loss()
 PATH = "chess_heuristic_evaluator"
 
 def pre_process_df(df: pandas.DataFrame):
-    df = df.head()
+    df = df.head(n=100)
     df["eval"] = df["Evaluation"].apply(parse_evaluation)
-    df['array_repr'] = df['FEN'].apply(fen_to_integer_array)
-    df = df.drop(columns=["Evaluation", "FEN"])
-    
-    X = df["array_repr"]
-    y = df["eval"]
+    df = df.drop(columns=["Evaluation"])
+    X = convert_fens_to_arrays(df["FEN"])
+    y = df["eval"].to_numpy()
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-    scaler = StandardScaler()
-    X_train = scaler.fit_transform(X_train)
-    X_test = scaler.transform(X_test)
+    X_train = SCALER.fit_transform(X_train)
+    X_test = SCALER.transform(X_test)
 
     train_dataset = ChessHeuristicDataset(X_train, y_train)
     test_dataset = ChessHeuristicDataset(X_test, y_test)
@@ -78,6 +75,11 @@ def parse_evaluation(eval: str) -> np.ndarray:
     if(eval.startswith("#-")):
         return np.array(-100_000, dtype=np.int32)
     return np.array(eval, dtype=np.int32)
+
+def convert_fens_to_arrays(s: pandas.Series) -> np.ndarray:
+    vec = np.vectorize(fen_to_integer_array, signature="()->(n)")
+    res = vec(s.to_numpy())
+    return res
 
 def fen_to_integer_array(board_fen: str) -> np.ndarray:
     fen_parts = board_fen.split(" ")
@@ -121,7 +123,7 @@ def fen_to_integer_array(board_fen: str) -> np.ndarray:
 
     arr.append(is_white)
     arr.extend(can_castle)
-    return np.array(arr, dtype=np.float16)
+    return np.array(arr, dtype=np.int8)
 
 def train_one_epoch(epoch_index, tb_writer, train_dl: "DataLoader"):
     running_loss = 0.
@@ -162,18 +164,17 @@ def train(train_dl: "DataLoader", test_dl: "DataLoader"):
     # Initializing in a separate cell so we can easily add more epochs to the same run
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     writer = SummaryWriter(f'runs/ChessHeuristicEvaluator_train_{timestamp}')
-    epoch_number = 0
 
     EPOCHS = 5
 
     best_vloss = 1_000_000.
 
     for epoch in range(EPOCHS):
-        print(f'EPOCH {epoch_number + 1}:')
+        print(f'EPOCH {epoch + 1}:')
 
         # Make sure gradient tracking is on, and do a pass over the data
         model.train(True)
-        avg_loss = train_one_epoch(epoch_number, writer, train_dl)
+        avg_loss = train_one_epoch(epoch, writer, train_dl)
 
 
         running_vloss = 0.0
@@ -196,16 +197,14 @@ def train(train_dl: "DataLoader", test_dl: "DataLoader"):
         # for both training and validation
         writer.add_scalars('Training vs. Validation Loss',
                         { 'Training' : avg_loss, 'Validation' : avg_vloss },
-                        epoch_number + 1)
+                        epoch + 1)
         writer.flush()
 
         # Track best performance, and save the model's state
         if avg_vloss < best_vloss:
             best_vloss = avg_vloss
-            model_path = f'chess_heuristic_evaluator_{timestamp}_{epoch_number}'
+            model_path = f'chess_heuristic_evaluator_{timestamp}_{epoch}'
             torch.save(model.state_dict(), model_path)
-
-        epoch_number += 1
 
 def start_training():
     abs_path = kagglehub.dataset_download("ronakbadhe/chess-evaluations")
