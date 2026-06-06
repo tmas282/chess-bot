@@ -24,7 +24,7 @@ powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 #### Clone the repository:
 
 ```bash
-git clone [https://github.com/tmas282/chess-bot.git](https://github.com/tmas282/chess-bot.git)
+git clone https://github.com/tmas282/chess-bot.git
 cd chess-bot
 ```
 #### Create a virtual environment:
