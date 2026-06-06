@@ -47,6 +47,7 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = ChessHeuristicEvaluator().to(DEVICE)
 EPOCHS = 200
 LEARNING_RATE = 0.002
+BATCH_SIZE = 256
 SCALER = MinMaxScaler()
 OPTIMIZER = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 LOSS_FN = torch.nn.MSELoss()
@@ -69,8 +70,8 @@ def pre_process_df(df: pandas.DataFrame):
     print("Creating Datasets and Dataloaders")
     train_dataset = ChessHeuristicDataset(X_train, y_train)
     test_dataset = ChessHeuristicDataset(X_test, y_test)
-    train_dl = DataLoader(train_dataset, batch_size=64, shuffle=True)
-    test_dl = DataLoader(test_dataset, batch_size=64, shuffle=False)
+    train_dl = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True, num_workers=4)
+    test_dl = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, pin_memory=True, num_workers=4)
 
     return train_dl, test_dl
 
@@ -148,10 +149,14 @@ def train_one_epoch(epoch_index, tb_writer, train_dl: "DataLoader"):
         OPTIMIZER.zero_grad()
 
         # Make predictions for this batch
-        outputs = model(inputs)
-
-        # Compute the loss and its gradients
-        loss = LOSS_FN(outputs, labels)
+        if(DEVICE == 'cuda'):
+            with torch.amp.autocast('cuda'):
+                outputs = model(inputs)
+                loss = LOSS_FN(outputs, labels)
+        else:
+            outputs = model(inputs)
+            # Compute the loss and its gradients
+            loss = LOSS_FN(outputs, labels)
         loss.backward()
 
         # Adjust learning weights
@@ -222,6 +227,7 @@ def start_training():
     df = pandas.read_csv(path)
     print("Preprocessing dataset")
     train_dl, test_dl = pre_process_df(df=df)
+    model = torch.compile(model)
     train(train_dl, test_dl)
 
 if __name__ == "__main__":
