@@ -4,11 +4,13 @@ A clean, from-scratch Python implementation of a chess-playing bot built using P
 
 This project was developed as a deep-dive learning exercise to thoroughly understand neural network architectures, policy/value estimation, and state representation in complex, adversarial board games.
 
-## 🚀 Quick Start & Setup
+## 🚀 Quick Setup
+
+### Method 1: Local Setup (Using uv)
 
 This project uses [uv](https://github.com/astral-sh/uv), an extremely fast Python package installer and resolver, to manage dependencies and virtual environments.
 
-### Prerequisites
+#### Prerequisites:
 
 Ensure you have Python 3.10+ and `uv` installed. If you don't have `uv` yet, install it via:
 
@@ -20,13 +22,13 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
 
-### Installation Steps
 #### Clone the repository:
 
 ```bash
 git clone https://github.com/tmas282/chess-bot.git
 cd chess-bot
 ```
+
 #### Create a virtual environment:
 Using uv, you can spin up an optimized virtual environment instantly:
 
@@ -52,6 +54,28 @@ uv sync
 
 ---
 
+### Method 2: Containerized Setup (Using Docker)
+If you prefer to keep your host machine clean or want a drop-in environment where everything "just works," you can use the provided multi-stage Dockerfile.
+
+#### Build the Docker Image:
+From the root of the repository, build the optimized slim image:
+
+```bash
+docker build -t chess-bot .
+```
+#### Access the Interactive Docker Shell
+To hop inside the container and manually interact with the files, run tests, or execute arbitrary Python scripts:
+
+```bash
+docker run --gpus all -it chess-bot /bin/bash
+```
+Once inside the shell, the virtual environment is already loaded into your PATH, so you can run Python scripts directly (e.g., python your_script.py).
+
+<br/>
+
+---
+
+<br/>
 
 > **💡 Important Project Note**
 >
