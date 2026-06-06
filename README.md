@@ -14,17 +14,17 @@ Ensure you have Python 3.10+ and `uv` installed. If you don't have `uv` yet, ins
 
 ```bash
 # macOS/Linux
-curl -LsSf https://astral-sh/uv/install.sh | sh
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Windows (PowerShell)
-powershell -c "irm https://astral-sh/uv/install.ps1 | iex"
+powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
 
 ### Installation Steps
 #### Clone the repository:
 
 ```bash
-git clone [https://github.com/tmas282/chess-bot.git](https://github.com/tmas282/chess-bot.git)
+git clone https://github.com/tmas282/chess-bot.git
 cd chess-bot
 ```
 #### Create a virtual environment:
