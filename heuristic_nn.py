@@ -53,15 +53,20 @@ LOSS_FN = torch.nn.MSELoss()
 PATH = "chess_heuristic_evaluator"
 
 def pre_process_df(df: pandas.DataFrame):
+    print("Normalizing Final Evaluation")
     df["Evaluation"] = df["Evaluation"].apply(parse_evaluation)
+    print("Converting FEN to array")
     X = convert_fens_to_arrays(df["FEN"])
     y = df["Evaluation"].to_numpy()
 
+    print("Splitting testing data and training data")
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
+    print("Normalizing input array")
     X_train = SCALER.fit_transform(X_train)
     X_test = SCALER.transform(X_test)
 
+    print("Creating Datasets and Dataloaders")
     train_dataset = ChessHeuristicDataset(X_train, y_train)
     test_dataset = ChessHeuristicDataset(X_test, y_test)
     train_dl = DataLoader(train_dataset, batch_size=64, shuffle=True)
@@ -170,6 +175,7 @@ def train(train_dl: "DataLoader", test_dl: "DataLoader"):
 
     best_vloss = 1_000_000.
 
+    print("Starting Training")
     for epoch in range(EPOCHS):
         print(f'EPOCH {epoch + 1}:')
 
@@ -206,16 +212,20 @@ def train(train_dl: "DataLoader", test_dl: "DataLoader"):
             best_vloss = avg_vloss
             model_path = f'chess_heuristic_evaluator_{timestamp}_{epoch}'
             torch.save(model.state_dict(), model_path)
+    print("Ended Training")
 
 def start_training():
+    print("Getting dataset")
     abs_path = kagglehub.dataset_download("ronakbadhe/chess-evaluations")
     path = os.path.join(abs_path, "chessData.csv")
+    print("Reading dataset")
     df = pandas.read_csv(path)
+    print("Preprocessing dataset")
     train_dl, test_dl = pre_process_df(df=df)
     train(train_dl, test_dl)
 
 if __name__ == "__main__":
-    print(DEVICE)
+    print(f"Using: {DEVICE}")
     start_training()
 
 def use_model():
