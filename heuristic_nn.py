@@ -45,9 +45,10 @@ class ChessHeuristicEvaluator(nn.Module):
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = ChessHeuristicEvaluator().to(DEVICE)
-EPOCHS = 10
+EPOCHS = 200
+LEARNING_RATE = 0.002
 SCALER = MinMaxScaler()
-OPTIMIZER = torch.optim.Adam(model.parameters())
+OPTIMIZER = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 LOSS_FN = torch.nn.MSELoss()
 PATH = "chess_heuristic_evaluator"
 
