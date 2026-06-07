@@ -1,5 +1,3 @@
-import time
-
 import kagglehub
 import numpy as np
 import pandas
@@ -14,8 +12,8 @@ from sklearn.preprocessing import MinMaxScaler
 
 class ChessHeuristicDataset(Dataset):
     def __init__(self, features, targets):
-        self.X = torch.tensor(features, dtype=torch.float).to(DEVICE)
-        self.y = torch.tensor(targets, dtype=torch.float).view(-1, 1).to(DEVICE)
+        self.X = torch.tensor(features, dtype=torch.float32)
+        self.y = torch.tensor(targets, dtype=torch.float32).view(-1, 1)
  
     def __len__(self):
         return len(self.X)
@@ -28,7 +26,7 @@ class ChessHeuristicEvaluator(nn.Module):
         super().__init__(*args, **kwargs)
         self.flat = nn.Flatten()
         self.heuristic = nn.Sequential(
-            nn.Linear(68 * 1, 256),
+            nn.Linear(64 * 1, 256),
             nn.ReLU(),
             nn.Linear(256, 128),
             nn.ReLU(),
@@ -47,7 +45,7 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = ChessHeuristicEvaluator().to(DEVICE)
 EPOCHS = 200
 LEARNING_RATE = 0.002
-BATCH_SIZE = 256
+BATCH_SIZE = 1024
 SCALER = MinMaxScaler()
 OPTIMIZER = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 LOSS_FN = torch.nn.MSELoss()
@@ -70,6 +68,10 @@ def pre_process_df(df: pandas.DataFrame):
     print("Creating Datasets and Dataloaders")
     train_dataset = ChessHeuristicDataset(X_train, y_train)
     test_dataset = ChessHeuristicDataset(X_test, y_test)
+    
+    return train_dataset, test_dataset
+
+def create_dataloaders(train_dataset: 'ChessHeuristicDataset', test_dataset: 'ChessHeuristicDataset'):
     train_dl = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True, num_workers=4)
     test_dl = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, pin_memory=True, num_workers=4)
 
@@ -77,14 +79,14 @@ def pre_process_df(df: pandas.DataFrame):
 
 def parse_evaluation(eval: str) -> np.ndarray:
     if(eval.startswith("#+")):
-        return np.array(10_000, dtype=np.int32)
+        return np.array(10_000, dtype=np.float32)
     if(eval.startswith("#-")):
-        return np.array(-10_000, dtype=np.int32)
-    eval_v = np.array(eval, dtype=np.int32)
+        return np.array(-10_000, dtype=np.float32)
+    eval_v = np.array(eval, dtype=np.float32)
     if(eval_v < -10_000):
-        return np.array(-10_000, dtype=np.int32)
+        return np.array(-10_000, dtype=np.float32)
     if(eval_v > 10_000):
-        return np.array(10_000, dtype=np.int32)
+        return np.array(10_000, dtype=np.float32)
     return eval_v
 
 def convert_fens_to_arrays(s: pandas.Series) -> np.ndarray:
@@ -128,10 +130,6 @@ def fen_to_integer_array(board_fen: str) -> np.ndarray:
         elif( i == '.'):
             arr.append(0)
     
-    can_castle = [1 if "K" in fen_parts[2] else 0, 1 if "Q" in fen_parts[2] else 0,
-                  1 if "k" in fen_parts[2] else 0, 1 if "q" in fen_parts[2] else 0]
-
-    arr.extend(can_castle)
     return np.array(arr, dtype=np.int8)
 
 def train_one_epoch(epoch_index, tb_writer, train_dl: "DataLoader"):
@@ -144,6 +142,7 @@ def train_one_epoch(epoch_index, tb_writer, train_dl: "DataLoader"):
     for i, data in enumerate(train_dl):
         # Every data instance is an input + label pair
         inputs, labels = data
+        inputs, labels = inputs.to(DEVICE), labels.to(DEVICE)
 
         # Zero your gradients for every batch!
         OPTIMIZER.zero_grad()
@@ -198,6 +197,7 @@ def train(train_dl: "DataLoader", test_dl: "DataLoader"):
         with torch.no_grad():
             for i, vdata in enumerate(test_dl):
                 vinputs, vlabels = vdata
+                vinputs, vlabels = vinputs.to(DEVICE), vlabels.to(DEVICE)
                 voutputs = model(vinputs)
                 vloss = LOSS_FN(voutputs, vlabels)
                 running_vloss += vloss
@@ -226,11 +226,25 @@ def start_training():
     print("Reading dataset")
     df = pandas.read_csv(path)
     print("Preprocessing dataset")
-    train_dl, test_dl = pre_process_df(df=df)
-    model = torch.compile(model)
+    train_ds, test_ds = pre_process_df(df=df)
+    train_dl, test_dl = create_dataloaders(train_ds, test_ds)
     train(train_dl, test_dl)
 
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-lr', '--learning-rate', type=float, help="Set the learning rate. Current: 0.002")
+    parser.add_argument('-e', '--epochs', type=int, help="Set the number of epochs (Current: 200)")
+    parser.add_argument('-bs', '--batch-size', type=int, help="Set the batch size (32,64,128,256,...). Current: 256")
+
+    args = parser.parse_args()
+    if not args.learning_rate  is None:
+        LEARNING_RATE = args.learning_rate
+    if not args.epochs  is None:
+        EPOCHS = args.epochs
+    if not args.batch_size  is None:
+        BATCH_SIZE = args.batch_size
+    
     print(f"Using: {DEVICE}")
     start_training()
 
