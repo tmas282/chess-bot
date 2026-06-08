@@ -6,6 +6,7 @@ import os
 from datetime import datetime
 from torch.utils.data import DataLoader, Dataset
 from torch import nn
+import torch.optim.lr_scheduler as lr_schedulers
 from torch.utils.tensorboard.writer import SummaryWriter
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
@@ -26,7 +27,9 @@ class ChessHeuristicEvaluator(nn.Module):
         super().__init__(*args, **kwargs)
         self.flat = nn.Flatten()
         self.heuristic = nn.Sequential(
-            nn.Linear(64 * 1, 256),
+            nn.Linear(64 * 1, 512),
+            nn.ReLU(),
+            nn.Linear(512, 256),
             nn.ReLU(),
             nn.Linear(256, 128),
             nn.ReLU(),
@@ -43,13 +46,16 @@ class ChessHeuristicEvaluator(nn.Module):
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = ChessHeuristicEvaluator().to(DEVICE)
-EPOCHS = 200
-LEARNING_RATE = 0.002
-BATCH_SIZE = 1024
+EPOCHS = 400
+INITIAL_LEARNING_RATE = 0.1
+BATCH_SIZE = 2048
 SCALER = MinMaxScaler()
-OPTIMIZER = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+OPTIMIZER = torch.optim.Adam(model.parameters(), lr=INITIAL_LEARNING_RATE)
+SCHEDULER = lr_schedulers.StepLR(OPTIMIZER, step_size=1024, gamma=0.5)
 LOSS_FN = torch.nn.MSELoss()
-PATH = "chess_heuristic_evaluator"
+MODEL_PATH = "chess_heuristic_evaluator"
+DATASET_TRAIN_PATH = "preprocessed_data/chess_heuristic_evaluator_train_dataset"
+DATASET_TEST_PATH = "preprocessed_data/chess_heuristic_evaluator_test_dataset"
 
 def pre_process_df(df: pandas.DataFrame):
     print("Normalizing Final Evaluation")
@@ -65,17 +71,11 @@ def pre_process_df(df: pandas.DataFrame):
     X_train = SCALER.fit_transform(X_train)
     X_test = SCALER.transform(X_test)
 
-    print("Creating Datasets and Dataloaders")
-    train_dataset = ChessHeuristicDataset(X_train, y_train)
-    test_dataset = ChessHeuristicDataset(X_test, y_test)
-    
-    return train_dataset, test_dataset
+    print("Normalizing target scalar")
+    y_train = SCALER.fit_transform(np.reshape(y_train, (-1, 1)))
+    y_test = SCALER.transform(np.reshape(y_test, (-1, 1)))
 
-def create_dataloaders(train_dataset: 'ChessHeuristicDataset', test_dataset: 'ChessHeuristicDataset'):
-    train_dl = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True, num_workers=4)
-    test_dl = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, pin_memory=True, num_workers=4)
-
-    return train_dl, test_dl
+    return X_train, X_test, y_train, y_test
 
 def parse_evaluation(eval: str) -> np.ndarray:
     if(eval.startswith("#+")):
@@ -132,6 +132,48 @@ def fen_to_integer_array(board_fen: str) -> np.ndarray:
     
     return np.array(arr, dtype=np.int8)
 
+def get_saved_arrays():
+    try:
+        X_train = np.load(f"{DATASET_TRAIN_PATH}_X.npy")
+        X_test = np.load(f"{DATASET_TEST_PATH}_X.npy")
+        y_train = np.load(f"{DATASET_TRAIN_PATH}_y.npy")
+        y_test = np.load(f"{DATASET_TEST_PATH}_y.npy")
+        return X_train, X_test, y_train, y_test
+    except Exception as e:
+        return None
+    
+def save_arrays(X_train: np.ndarray, X_test: np.ndarray, y_train: np.ndarray, y_test: np.ndarray):
+    os.mkdir(f"{DATASET_TRAIN_PATH.split("/")[0]}")
+    np.save(f"{DATASET_TRAIN_PATH}_X.npy", X_train)
+    np.save(f"{DATASET_TEST_PATH}_X.npy", X_test)
+    np.save(f"{DATASET_TRAIN_PATH}_y.npy", y_train)
+    np.save(f"{DATASET_TEST_PATH}_y.npy", y_test)
+
+def get_datasets():
+    arrs = get_saved_arrays()
+    if arrs is None:
+        print("Getting dataset")
+        abs_path = kagglehub.dataset_download("ronakbadhe/chess-evaluations")
+        path = os.path.join(abs_path, "chessData.csv")
+        print("Reading dataset")
+        df = pandas.read_csv(path)
+        print("Preprocessing dataset")
+        arrs = pre_process_df(df=df)
+        save_arrays(arrs[0], arrs[1], arrs[2], arrs[3])
+    else:
+        print("Preprocessing skipped")
+    print("Creating Datasets and Dataloaders")
+    train_dataset = ChessHeuristicDataset(arrs[0], arrs[2])
+    test_dataset = ChessHeuristicDataset(arrs[1], arrs[3])
+    
+    return train_dataset, test_dataset
+
+def create_dataloaders(train_dataset: 'ChessHeuristicDataset', test_dataset: 'ChessHeuristicDataset'):
+    train_dl = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True, num_workers=4)
+    test_dl = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, pin_memory=True, num_workers=4)
+
+    return train_dl, test_dl
+
 def train_one_epoch(epoch_index, tb_writer, train_dl: "DataLoader"):
     running_loss = 0.
     last_loss = 0.
@@ -160,12 +202,13 @@ def train_one_epoch(epoch_index, tb_writer, train_dl: "DataLoader"):
 
         # Adjust learning weights
         OPTIMIZER.step()
+        SCHEDULER.step()
 
         # Gather data and report
         running_loss += loss.item()
         if i % 1000 == 999:
             last_loss = running_loss / 1000 # loss per batch
-            print(f'  batch {i + 1} loss: {last_loss}')
+            print(f'LR {OPTIMIZER.param_groups[0]['lr']:.5f}  batch {i + 1} loss: {last_loss}')
             tb_x = epoch_index * len(train_dl) + i + 1
             tb_writer.add_scalar('Loss/train', last_loss, tb_x)
             running_loss = 0.
@@ -215,27 +258,21 @@ def train(train_dl: "DataLoader", test_dl: "DataLoader"):
         # Track best performance, and save the model's state
         if avg_vloss < best_vloss:
             best_vloss = avg_vloss
-            model_path = f'chess_heuristic_evaluator_{timestamp}_{epoch}'
+            model_path = f'{MODEL_PATH}_{timestamp}_{epoch}'
             torch.save(model.state_dict(), model_path)
     print("Ended Training")
 
 def start_training():
-    print("Getting dataset")
-    abs_path = kagglehub.dataset_download("ronakbadhe/chess-evaluations")
-    path = os.path.join(abs_path, "chessData.csv")
-    print("Reading dataset")
-    df = pandas.read_csv(path)
-    print("Preprocessing dataset")
-    train_ds, test_ds = pre_process_df(df=df)
+    train_ds, test_ds = get_datasets()
     train_dl, test_dl = create_dataloaders(train_ds, test_ds)
     train(train_dl, test_dl)
 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('-lr', '--learning-rate', type=float, help="Set the learning rate. Current: 0.002")
-    parser.add_argument('-e', '--epochs', type=int, help="Set the number of epochs (Current: 200)")
-    parser.add_argument('-bs', '--batch-size', type=int, help="Set the batch size (32,64,128,256,...). Current: 256")
+    parser.add_argument('-lr', '--learning-rate', type=float, help=f"Set the initial learning rate. Current: {INITIAL_LEARNING_RATE}")
+    parser.add_argument('-e', '--epochs', type=int, help=f"Set the number of epochs (Current: {EPOCHS})")
+    parser.add_argument('-bs', '--batch-size', type=int, help=f"Set the batch size (32,64,128,256,...). Current: {BATCH_SIZE}")
 
     args = parser.parse_args()
     if not args.learning_rate  is None:
@@ -245,9 +282,9 @@ if __name__ == "__main__":
     if not args.batch_size  is None:
         BATCH_SIZE = args.batch_size
     
-    print(f"Using: {DEVICE}")
+    print(f"DEVICE={DEVICE}\nINITIAL_LEARNING_RATE={INITIAL_LEARNING_RATE}\nEPOCHS={EPOCHS}\nBATCH_SIZE={BATCH_SIZE}")
     start_training()
 
 def use_model():
     model = ChessHeuristicEvaluator()
-    model.load_state_dict(torch.load(PATH))
+    model.load_state_dict(torch.load(MODEL_PATH))
