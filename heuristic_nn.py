@@ -25,35 +25,36 @@ class ChessHeuristicDataset(Dataset):
 class ChessHeuristicEvaluator(nn.Module):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.flat = nn.Flatten()
         self.heuristic = nn.Sequential(
-            nn.Linear(64 * 1, 512),
+            nn.Conv2d(in_channels=1,out_channels=4, kernel_size=3, padding=0, stride=1),
             nn.ReLU(),
-            nn.Linear(512, 256),
+            nn.Conv2d(in_channels=4,out_channels=4, kernel_size=3, padding=0, stride=1),
             nn.ReLU(),
-            nn.Linear(256, 128),
+            nn.Conv2d(in_channels=4,out_channels=4, kernel_size=3, padding=0, stride=1),
             nn.ReLU(),
-            nn.Linear(128, 64),
+            nn.Flatten(),
+            nn.Linear(4 * 2 * 2, 1024),
             nn.ReLU(),
-            nn.Linear(64, 32),
+            nn.Linear(1024, 1024),
             nn.ReLU(),
-            nn.Linear(32, 1)
+            nn.Linear(1024, 512),
+            nn.ReLU(),
+            nn.Linear(512, 1)
         )
     def forward(self, x):
-        x = self.flat(x)
         logits = self.heuristic(x)
         return logits
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = ChessHeuristicEvaluator().to(DEVICE)
-EPOCHS = 400
-INITIAL_LEARNING_RATE = 0.1
-BATCH_SIZE = 2048
+EPOCHS = 50
+INITIAL_LEARNING_RATE = 0.001
+BATCH_SIZE = 4096
 SCALER = MinMaxScaler()
 OPTIMIZER = torch.optim.Adam(model.parameters(), lr=INITIAL_LEARNING_RATE)
-SCHEDULER = lr_schedulers.StepLR(OPTIMIZER, step_size=1024, gamma=0.5)
-LOSS_FN = torch.nn.MSELoss()
-MODEL_PATH = "chess_heuristic_evaluator"
+SCHEDULER = lr_schedulers.StepLR(OPTIMIZER, gamma=0.5, step_size=37)
+LOSS_FN = torch.nn.L1Loss()
+MODEL_PATH = "model_states/chess_heuristic_evaluator"
 DATASET_TRAIN_PATH = "preprocessed_data/chess_heuristic_evaluator_train_dataset"
 DATASET_TEST_PATH = "preprocessed_data/chess_heuristic_evaluator_test_dataset"
 
@@ -64,6 +65,11 @@ def pre_process_df(df: pandas.DataFrame):
     X = convert_fens_to_arrays(df["FEN"])
     y = df["Evaluation"].to_numpy()
 
+    X_train, X_test, y_train, y_test = normalize_split_data(X, y)
+
+    return X_train, X_test, y_train, y_test
+
+def normalize_split_data(X: np.ndarray, y: np.ndarray):
     print("Splitting testing data and training data")
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
@@ -71,22 +77,20 @@ def pre_process_df(df: pandas.DataFrame):
     X_train = SCALER.fit_transform(X_train)
     X_test = SCALER.transform(X_test)
 
-    print("Normalizing target scalar")
-    y_train = SCALER.fit_transform(np.reshape(y_train, (-1, 1)))
-    y_test = SCALER.transform(np.reshape(y_test, (-1, 1)))
-
-    return X_train, X_test, y_train, y_test
+    return X_train.reshape(X_train.shape[0],1,8,8), X_test.reshape(X_test.shape[0],1,8,8), y_train, y_test
 
 def parse_evaluation(eval: str) -> np.ndarray:
+    max_w = np.array(1_000, dtype=np.float32)
+    max_b = np.array(-1_000, dtype=np.float32)
     if(eval.startswith("#+")):
-        return np.array(10_000, dtype=np.float32)
-    if(eval.startswith("#-")):
-        return np.array(-10_000, dtype=np.float32)
+        return max_w
+    if eval.startswith("#-"):
+        return max_b
     eval_v = np.array(eval, dtype=np.float32)
-    if(eval_v < -10_000):
-        return np.array(-10_000, dtype=np.float32)
-    if(eval_v > 10_000):
-        return np.array(10_000, dtype=np.float32)
+    if(eval_v < max_b):
+        return np.array(max_b, dtype=np.float32)
+    if(eval_v > max_w):
+        return np.array(max_w, dtype=np.float32)
     return eval_v
 
 def convert_fens_to_arrays(s: pandas.Series) -> np.ndarray:
@@ -143,11 +147,13 @@ def get_saved_arrays():
         return None
     
 def save_arrays(X_train: np.ndarray, X_test: np.ndarray, y_train: np.ndarray, y_test: np.ndarray):
-    os.mkdir(f"{DATASET_TRAIN_PATH.split("/")[0]}")
-    np.save(f"{DATASET_TRAIN_PATH}_X.npy", X_train)
-    np.save(f"{DATASET_TEST_PATH}_X.npy", X_test)
-    np.save(f"{DATASET_TRAIN_PATH}_y.npy", y_train)
-    np.save(f"{DATASET_TEST_PATH}_y.npy", y_test)
+    try:
+        os.mkdir(f"{DATASET_TRAIN_PATH.split("/")[0]}")
+    finally:
+        np.save(f"{DATASET_TRAIN_PATH}_X.npy", X_train)
+        np.save(f"{DATASET_TEST_PATH}_X.npy", X_test)
+        np.save(f"{DATASET_TRAIN_PATH}_y.npy", y_train)
+        np.save(f"{DATASET_TEST_PATH}_y.npy", y_test)
 
 def get_datasets():
     arrs = get_saved_arrays()
@@ -161,7 +167,7 @@ def get_datasets():
         arrs = pre_process_df(df=df)
         save_arrays(arrs[0], arrs[1], arrs[2], arrs[3])
     else:
-        print("Preprocessing skipped")
+        print("Preprocessing skipped, using saved normalization")
     print("Creating Datasets and Dataloaders")
     train_dataset = ChessHeuristicDataset(arrs[0], arrs[2])
     test_dataset = ChessHeuristicDataset(arrs[1], arrs[3])
@@ -189,26 +195,19 @@ def train_one_epoch(epoch_index, tb_writer, train_dl: "DataLoader"):
         # Zero your gradients for every batch!
         OPTIMIZER.zero_grad()
 
-        # Make predictions for this batch
-        if(DEVICE == 'cuda'):
-            with torch.amp.autocast('cuda'):
-                outputs = model(inputs)
-                loss = LOSS_FN(outputs, labels)
-        else:
-            outputs = model(inputs)
-            # Compute the loss and its gradients
-            loss = LOSS_FN(outputs, labels)
+        outputs = model(inputs)
+        # Compute the loss and its gradients
+        loss = LOSS_FN(outputs, labels)
         loss.backward()
 
         # Adjust learning weights
         OPTIMIZER.step()
-        SCHEDULER.step()
 
         # Gather data and report
         running_loss += loss.item()
         if i % 1000 == 999:
             last_loss = running_loss / 1000 # loss per batch
-            print(f'LR {OPTIMIZER.param_groups[0]['lr']:.5f}  batch {i + 1} loss: {last_loss}')
+            print(f'Lr {OPTIMIZER.param_groups[0]['lr']}  batch {i + 1} loss: {last_loss}')
             tb_x = epoch_index * len(train_dl) + i + 1
             tb_writer.add_scalar('Loss/train', last_loss, tb_x)
             running_loss = 0.
@@ -247,7 +246,9 @@ def train(train_dl: "DataLoader", test_dl: "DataLoader"):
 
         avg_vloss = running_vloss / (i + 1)
         print(f'LOSS train {avg_loss} valid {avg_vloss}')
-
+        
+        SCHEDULER.step()
+        
         # Log the running loss averaged per batch
         # for both training and validation
         writer.add_scalars('Training vs. Validation Loss',
@@ -262,29 +263,23 @@ def train(train_dl: "DataLoader", test_dl: "DataLoader"):
             torch.save(model.state_dict(), model_path)
     print("Ended Training")
 
+def create_model_state_folder():
+    try:
+        os.mkdir(MODEL_PATH.split("/")[0])
+    except:
+        pass
+
 def start_training():
+    create_model_state_folder()
     train_ds, test_ds = get_datasets()
     train_dl, test_dl = create_dataloaders(train_ds, test_ds)
     train(train_dl, test_dl)
 
 if __name__ == "__main__":
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-lr', '--learning-rate', type=float, help=f"Set the initial learning rate. Current: {INITIAL_LEARNING_RATE}")
-    parser.add_argument('-e', '--epochs', type=int, help=f"Set the number of epochs (Current: {EPOCHS})")
-    parser.add_argument('-bs', '--batch-size', type=int, help=f"Set the batch size (32,64,128,256,...). Current: {BATCH_SIZE}")
-
-    args = parser.parse_args()
-    if not args.learning_rate  is None:
-        LEARNING_RATE = args.learning_rate
-    if not args.epochs  is None:
-        EPOCHS = args.epochs
-    if not args.batch_size  is None:
-        BATCH_SIZE = args.batch_size
-    
     print(f"DEVICE={DEVICE}\nINITIAL_LEARNING_RATE={INITIAL_LEARNING_RATE}\nEPOCHS={EPOCHS}\nBATCH_SIZE={BATCH_SIZE}")
     start_training()
 
 def use_model():
+    create_model_state_folder()
     model = ChessHeuristicEvaluator()
     model.load_state_dict(torch.load(MODEL_PATH))
