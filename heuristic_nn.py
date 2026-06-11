@@ -7,7 +7,7 @@ from datetime import datetime
 from torch.utils.data import DataLoader, Dataset
 from torch import nn
 import torch.optim.lr_scheduler as lr_schedulers
-from torch.utils.tensorboard.writer import SummaryWriter
+from torch.utils.tensorboard.writer import SummaryWriter #tensorboard --logdir=runs
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
 
@@ -26,20 +26,15 @@ class ChessHeuristicEvaluator(nn.Module):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.heuristic = nn.Sequential(
-            nn.Conv2d(in_channels=1,out_channels=4, kernel_size=3, padding=0, stride=1),
+            nn.Conv2d(in_channels=1,out_channels=128, kernel_size=3, padding=0, stride=1),
             nn.ReLU(),
-            nn.Conv2d(in_channels=4,out_channels=4, kernel_size=3, padding=0, stride=1),
+            nn.Conv2d(in_channels=128,out_channels=256, kernel_size=3, padding=0, stride=1),
             nn.ReLU(),
-            nn.Conv2d(in_channels=4,out_channels=4, kernel_size=3, padding=0, stride=1),
+            nn.Conv2d(in_channels=256,out_channels=512, kernel_size=3, padding=0, stride=1),
             nn.ReLU(),
             nn.Flatten(),
-            nn.Linear(4 * 2 * 2, 1024),
-            nn.ReLU(),
-            nn.Linear(1024, 1024),
-            nn.ReLU(),
-            nn.Linear(1024, 512),
-            nn.ReLU(),
-            nn.Linear(512, 1)
+            nn.Linear(512 * 2 * 2, 64),
+            nn.Linear(64, 1),
         )
     def forward(self, x):
         logits = self.heuristic(x)
@@ -47,13 +42,13 @@ class ChessHeuristicEvaluator(nn.Module):
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = ChessHeuristicEvaluator().to(DEVICE)
-EPOCHS = 50
-INITIAL_LEARNING_RATE = 0.001
-BATCH_SIZE = 4096
+EPOCHS = 200
+INITIAL_LEARNING_RATE = 0.01
+BATCH_SIZE = 1024
 SCALER = MinMaxScaler()
 OPTIMIZER = torch.optim.Adam(model.parameters(), lr=INITIAL_LEARNING_RATE)
-SCHEDULER = lr_schedulers.StepLR(OPTIMIZER, gamma=0.5, step_size=37)
-LOSS_FN = torch.nn.L1Loss()
+SCHEDULER = lr_schedulers.ReduceLROnPlateau(OPTIMIZER, mode='min', factor=0.1, patience=10)
+LOSS_FN = torch.nn.MSELoss()
 MODEL_PATH = "model_states/chess_heuristic_evaluator"
 DATASET_TRAIN_PATH = "preprocessed_data/chess_heuristic_evaluator_train_dataset"
 DATASET_TEST_PATH = "preprocessed_data/chess_heuristic_evaluator_test_dataset"
@@ -247,7 +242,7 @@ def train(train_dl: "DataLoader", test_dl: "DataLoader"):
         avg_vloss = running_vloss / (i + 1)
         print(f'LOSS train {avg_loss} valid {avg_vloss}')
         
-        SCHEDULER.step()
+        SCHEDULER.step(avg_vloss)
         
         # Log the running loss averaged per batch
         # for both training and validation
