@@ -1,11 +1,13 @@
 import numpy as np
 
 def fens_to_arrays(fens: np.ndarray) -> np.ndarray:
-    vec = np.vectorize(fen_to_array, signature="()->(12,8,8)")
+    vec = np.vectorize(fen_to_array, signature="(1)->(12,8,8)")
     res = vec(fens)
     return res
 
-def fen_to_array(fen: str):
+def fen_to_array(fen: str | np.ndarray):
+    if(type(fen) == np.ndarray):
+        fen = fen[0]
     res = np.zeros(shape=(12,8,8),dtype=np.uint8)
 
     for r, col_v in enumerate(fen.split(" ")[0].split("/")):

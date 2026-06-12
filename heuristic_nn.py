@@ -1,6 +1,5 @@
 import kagglehub
 import numpy as np
-import pandas
 import polars
 import torch
 import os
@@ -10,7 +9,6 @@ from torch import nn
 import torch.optim.lr_scheduler as lr_schedulers
 from torch.utils.tensorboard.writer import SummaryWriter #tensorboard --logdir=runs
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import MinMaxScaler
 
 from utils.fen_to_array import fens_to_arrays
 from utils.model_files import create_model_state_folder
@@ -18,7 +16,7 @@ from utils.numpy_array_files import get_saved_arrays, save_arrays
 
 class ChessHeuristicDataset(Dataset):
     def __init__(self, features, targets):
-        self.X = torch.tensor(features, dtype=torch.float32)
+        self.X = torch.tensor(features, dtype=torch.uint8)
         self.y = torch.tensor(targets, dtype=torch.float32).view(-1, 1)
  
     def __len__(self):
@@ -31,18 +29,19 @@ class ChessHeuristicEvaluator(nn.Module):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.heuristic = nn.Sequential(
-            nn.Conv2d(in_channels=1,out_channels=128, kernel_size=3, padding=1, stride=1),
+            nn.Conv2d(in_channels=12,out_channels=512, kernel_size=3, padding=1, stride=1),
             nn.ReLU(),
-            nn.Conv2d(in_channels=128,out_channels=256, kernel_size=3, padding=1, stride=1),
+            nn.Conv2d(in_channels=512,out_channels=256, kernel_size=3, padding=1, stride=1),
             nn.ReLU(),
-            nn.Conv2d(in_channels=256,out_channels=512, kernel_size=3, padding=1, stride=1),
+            nn.Conv2d(in_channels=256,out_channels=128, kernel_size=3, padding=1, stride=1),
             nn.ReLU(),
             nn.Flatten(),
-            nn.Linear(512 * 8 * 8, 64),
+            nn.Linear(128 * 8 * 8, 64),
             nn.ReLU(),
             nn.Linear(64, 1),
         )
     def forward(self, x):
+        x = x.type(torch.float32)
         logits = self.heuristic(x)
         return logits
 
@@ -51,7 +50,6 @@ model = ChessHeuristicEvaluator().to(DEVICE)
 EPOCHS = 200
 INITIAL_LEARNING_RATE = 0.01
 BATCH_SIZE = 256
-SCALER = MinMaxScaler()
 OPTIMIZER = torch.optim.Adam(model.parameters(), lr=INITIAL_LEARNING_RATE)
 SCHEDULER = lr_schedulers.ReduceLROnPlateau(OPTIMIZER, mode='min', factor=0.1, patience=10)
 LOSS_FN = torch.nn.MSELoss()

@@ -14,6 +14,8 @@ def get_saved_arrays(dataset_train_path: str, dataset_test_path: str):
 def save_arrays(dataset_train_path: str, dataset_test_path: str, X_train: np.ndarray, X_test: np.ndarray, y_train: np.ndarray, y_test: np.ndarray):
     try:
         os.mkdir(f"{dataset_train_path.split("/")[0]}")
+    except:
+        pass
     finally:
         np.save(f"{dataset_train_path}_X.npy", X_train)
         np.save(f"{dataset_test_path}_X.npy", X_test)
