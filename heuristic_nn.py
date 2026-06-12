@@ -1,6 +1,7 @@
 import kagglehub
 import numpy as np
 import pandas
+import polars
 import torch
 import os
 from datetime import datetime
@@ -10,6 +11,10 @@ import torch.optim.lr_scheduler as lr_schedulers
 from torch.utils.tensorboard.writer import SummaryWriter #tensorboard --logdir=runs
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
+
+from utils.fen_to_array import fens_to_arrays
+from utils.model_files import create_model_state_folder
+from utils.numpy_array_files import get_saved_arrays, save_arrays
 
 class ChessHeuristicDataset(Dataset):
     def __init__(self, features, targets):
@@ -26,14 +31,15 @@ class ChessHeuristicEvaluator(nn.Module):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.heuristic = nn.Sequential(
-            nn.Conv2d(in_channels=1,out_channels=128, kernel_size=3, padding=0, stride=1),
+            nn.Conv2d(in_channels=1,out_channels=128, kernel_size=3, padding=1, stride=1),
             nn.ReLU(),
-            nn.Conv2d(in_channels=128,out_channels=256, kernel_size=3, padding=0, stride=1),
+            nn.Conv2d(in_channels=128,out_channels=256, kernel_size=3, padding=1, stride=1),
             nn.ReLU(),
-            nn.Conv2d(in_channels=256,out_channels=512, kernel_size=3, padding=0, stride=1),
+            nn.Conv2d(in_channels=256,out_channels=512, kernel_size=3, padding=1, stride=1),
             nn.ReLU(),
             nn.Flatten(),
-            nn.Linear(512 * 2 * 2, 64),
+            nn.Linear(512 * 8 * 8, 64),
+            nn.ReLU(),
             nn.Linear(64, 1),
         )
     def forward(self, x):
@@ -44,7 +50,7 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = ChessHeuristicEvaluator().to(DEVICE)
 EPOCHS = 200
 INITIAL_LEARNING_RATE = 0.01
-BATCH_SIZE = 1024
+BATCH_SIZE = 256
 SCALER = MinMaxScaler()
 OPTIMIZER = torch.optim.Adam(model.parameters(), lr=INITIAL_LEARNING_RATE)
 SCHEDULER = lr_schedulers.ReduceLROnPlateau(OPTIMIZER, mode='min', factor=0.1, patience=10)
@@ -53,12 +59,17 @@ MODEL_PATH = "model_states/chess_heuristic_evaluator"
 DATASET_TRAIN_PATH = "preprocessed_data/chess_heuristic_evaluator_train_dataset"
 DATASET_TEST_PATH = "preprocessed_data/chess_heuristic_evaluator_test_dataset"
 
-def pre_process_df(df: pandas.DataFrame):
+def pre_process_df(df: polars.DataFrame):
     print("Normalizing Final Evaluation")
-    df["Evaluation"] = df["Evaluation"].apply(parse_evaluation)
-    print("Converting FEN to array")
-    X = convert_fens_to_arrays(df["FEN"])
-    y = df["Evaluation"].to_numpy()
+    new_df = df.filter(~polars.col("Evaluation").str.contains("#"))
+    new_df = new_df.filter((polars.col("Evaluation").cast(polars.Float32) <= 1000) & (polars.col("Evaluation").cast(polars.Int32) >= -1000))
+    new_df = new_df.with_columns(
+        Evaluation=polars.col("Evaluation").cast(polars.Float32)
+    )
+    y = new_df.select(polars.col("Evaluation")).to_numpy()
+    print("Normalizing FEN")
+    X = fens_to_arrays(new_df.select(polars.col("FEN")).to_numpy())
+    
 
     X_train, X_test, y_train, y_test = normalize_split_data(X, y)
 
@@ -68,99 +79,19 @@ def normalize_split_data(X: np.ndarray, y: np.ndarray):
     print("Splitting testing data and training data")
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-    print("Normalizing input array")
-    X_train = SCALER.fit_transform(X_train)
-    X_test = SCALER.transform(X_test)
-
-    return X_train.reshape(X_train.shape[0],1,8,8), X_test.reshape(X_test.shape[0],1,8,8), y_train, y_test
-
-def parse_evaluation(eval: str) -> np.ndarray:
-    max_w = np.array(1_000, dtype=np.float32)
-    max_b = np.array(-1_000, dtype=np.float32)
-    if(eval.startswith("#+")):
-        return max_w
-    if eval.startswith("#-"):
-        return max_b
-    eval_v = np.array(eval, dtype=np.float32)
-    if(eval_v < max_b):
-        return np.array(max_b, dtype=np.float32)
-    if(eval_v > max_w):
-        return np.array(max_w, dtype=np.float32)
-    return eval_v
-
-def convert_fens_to_arrays(s: pandas.Series) -> np.ndarray:
-    vec = np.vectorize(fen_to_integer_array, signature="()->(n)")
-    res = vec(s.to_numpy())
-    return res
-
-def fen_to_integer_array(board_fen: str) -> np.ndarray:
-    fen_parts = board_fen.split(" ")
-    arr = []
-    for i in str(fen_parts[0]):
-        try:
-            arr.extend([0 for _ in range(int(i))])
-            continue
-        except:
-            pass
-        if( i == 'r'):
-            arr.append(-5)
-        elif( i == 'n'):
-            arr.append(-3)
-        elif( i == 'b'):
-            arr.append(-4)
-        elif( i == 'q'):
-            arr.append(-9)
-        elif( i == 'k'):
-            arr.append(-10)
-        elif( i == 'p'):
-            arr.append(-1)
-        elif( i == 'R'):
-            arr.append(5)
-        elif( i == 'N'):
-            arr.append(3)
-        elif( i == 'B'):
-            arr.append(4)
-        elif( i == 'Q'):
-            arr.append(9)
-        elif( i == 'K'):
-            arr.append(10)
-        elif( i == 'P'):
-            arr.append(1)
-        elif( i == '.'):
-            arr.append(0)
-    
-    return np.array(arr, dtype=np.int8)
-
-def get_saved_arrays():
-    try:
-        X_train = np.load(f"{DATASET_TRAIN_PATH}_X.npy")
-        X_test = np.load(f"{DATASET_TEST_PATH}_X.npy")
-        y_train = np.load(f"{DATASET_TRAIN_PATH}_y.npy")
-        y_test = np.load(f"{DATASET_TEST_PATH}_y.npy")
-        return X_train, X_test, y_train, y_test
-    except Exception as e:
-        return None
-    
-def save_arrays(X_train: np.ndarray, X_test: np.ndarray, y_train: np.ndarray, y_test: np.ndarray):
-    try:
-        os.mkdir(f"{DATASET_TRAIN_PATH.split("/")[0]}")
-    finally:
-        np.save(f"{DATASET_TRAIN_PATH}_X.npy", X_train)
-        np.save(f"{DATASET_TEST_PATH}_X.npy", X_test)
-        np.save(f"{DATASET_TRAIN_PATH}_y.npy", y_train)
-        np.save(f"{DATASET_TEST_PATH}_y.npy", y_test)
+    return X_train, X_test, y_train, y_test
 
 def get_datasets():
-    arrs = get_saved_arrays()
+    arrs = get_saved_arrays(DATASET_TRAIN_PATH, DATASET_TEST_PATH)
     if arrs is None:
         print("Getting dataset")
         abs_path = kagglehub.dataset_download("ronakbadhe/chess-evaluations")
         path = os.path.join(abs_path, "chessData.csv")
         print("Reading dataset")
-        df = pandas.read_csv(path)
+        df = polars.read_csv(path)
         print("Preprocessing dataset")
         arrs = pre_process_df(df=df)
-        save_arrays(arrs[0], arrs[1], arrs[2], arrs[3])
+        save_arrays(DATASET_TRAIN_PATH, DATASET_TEST_PATH, arrs[0], arrs[1], arrs[2], arrs[3])
     else:
         print("Preprocessing skipped, using saved normalization")
     print("Creating Datasets and Dataloaders")
@@ -258,20 +189,14 @@ def train(train_dl: "DataLoader", test_dl: "DataLoader"):
             torch.save(model.state_dict(), model_path)
     print("Ended Training")
 
-def create_model_state_folder():
-    try:
-        os.mkdir(MODEL_PATH.split("/")[0])
-    except:
-        pass
-
 def start_training():
-    create_model_state_folder()
+    print(f"DEVICE={DEVICE}\nINITIAL_LEARNING_RATE={INITIAL_LEARNING_RATE}\nEPOCHS={EPOCHS}\nBATCH_SIZE={BATCH_SIZE}")
+    create_model_state_folder(MODEL_PATH)
     train_ds, test_ds = get_datasets()
     train_dl, test_dl = create_dataloaders(train_ds, test_ds)
     train(train_dl, test_dl)
 
 if __name__ == "__main__":
-    print(f"DEVICE={DEVICE}\nINITIAL_LEARNING_RATE={INITIAL_LEARNING_RATE}\nEPOCHS={EPOCHS}\nBATCH_SIZE={BATCH_SIZE}")
     start_training()
 
 def use_model():
