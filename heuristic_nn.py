@@ -29,14 +29,14 @@ class ChessHeuristicEvaluator(nn.Module):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.heuristic = nn.Sequential(
-            nn.Conv2d(in_channels=12,out_channels=512, kernel_size=3, padding=1, stride=1),
+            nn.Conv2d(in_channels=12,out_channels=256, kernel_size=3, padding=1, stride=1),
             nn.ReLU(),
-            nn.Conv2d(in_channels=512,out_channels=256, kernel_size=3, padding=1, stride=1),
+            nn.Conv2d(in_channels=256,out_channels=256, kernel_size=3, padding=1, stride=1),
             nn.ReLU(),
-            nn.Conv2d(in_channels=256,out_channels=128, kernel_size=3, padding=1, stride=1),
+            nn.Conv2d(in_channels=256,out_channels=256, kernel_size=3, padding=1, stride=1),
             nn.ReLU(),
             nn.Flatten(),
-            nn.Linear(128 * 8 * 8, 64),
+            nn.Linear(256 * 8 * 8, 64),
             nn.ReLU(),
             nn.Linear(64, 1),
         )
@@ -51,7 +51,7 @@ EPOCHS = 200
 INITIAL_LEARNING_RATE = 0.01
 BATCH_SIZE = 256
 OPTIMIZER = torch.optim.Adam(model.parameters(), lr=INITIAL_LEARNING_RATE)
-SCHEDULER = lr_schedulers.ReduceLROnPlateau(OPTIMIZER, mode='min', factor=0.1, patience=10)
+SCHEDULER = lr_schedulers.ReduceLROnPlateau(OPTIMIZER, mode='min', factor=0.1, patience=1)
 LOSS_FN = torch.nn.MSELoss()
 MODEL_PATH = "model_states/chess_heuristic_evaluator"
 DATASET_TRAIN_PATH = "preprocessed_data/chess_heuristic_evaluator_train_dataset"
