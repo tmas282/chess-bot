@@ -31,16 +31,16 @@ class ChessHeuristicEvaluator(nn.Module):
         super().__init__(*args, **kwargs)
         self.heuristic = nn.Sequential(
             nn.Conv2d(in_channels=12,out_channels=512, kernel_size=3, padding=1, stride=1),
-            nn.Tanh(),
+            nn.ReLU(),
             nn.Conv2d(in_channels=512,out_channels=256, kernel_size=3, padding=1, stride=1),
-            nn.Tanh(),
+            nn.ReLU(),
             nn.Conv2d(in_channels=256,out_channels=256, kernel_size=3, padding=1, stride=1),
-            nn.Tanh(),
+            nn.ReLU(),
             nn.Flatten(),
             nn.Linear(256 * 8 * 8, 256),
-            nn.Tanh(),
+            nn.ReLU(),
             nn.Linear(256, 256),
-            nn.Tanh(),
+            nn.ReLU(),
             nn.Linear(256, 1)
         )
     def forward(self, x):
