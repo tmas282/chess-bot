@@ -44,7 +44,7 @@ class ChessHeuristicEvaluator(nn.Module):
             nn.Conv2d(in_channels=128,out_channels=64, kernel_size=3, padding=1, stride=1),
             nn.BatchNorm2d(num_features=64),
             nn.ReLU(),
-            nn.Conv2d(in_channels=32,out_channels=16, kernel_size=3, padding=1, stride=1),
+            nn.Conv2d(in_channels=64,out_channels=16, kernel_size=3, padding=1, stride=1),
             nn.BatchNorm2d(num_features=16),
             nn.ReLU(),
             nn.Flatten(),
