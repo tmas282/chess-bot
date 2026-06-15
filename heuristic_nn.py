@@ -48,6 +48,7 @@ class ChessHeuristicEvaluator(nn.Module):
             nn.Dropout(p=0.2),
             nn.Linear(256, 16),
             nn.ReLU(),
+            nn.Dropout(p=0.2),
             nn.Linear(16, 1),
         )
     def forward(self, x):
@@ -70,7 +71,6 @@ DATASET_TEST_PATH = "preprocessed_data/chess_heuristic_evaluator_test_dataset"
 def pre_process_df(df: polars.DataFrame):
     print("Normalizing Final Evaluation")
     df = df.filter(~polars.col("Evaluation").str.contains("#"))
-    df = df.filter((polars.col("Evaluation").cast(polars.Float32) <= 1000) & (polars.col("Evaluation").cast(polars.Int32) >= -1000))
     df = df.with_columns(
         Evaluation=polars.col("Evaluation").cast(polars.Float32).map_batches(lambda x: np.tanh(x/200))
     )
