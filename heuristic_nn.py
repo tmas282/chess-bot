@@ -145,7 +145,7 @@ def train_one_epoch(epoch_index, tb_writer, train_dl: "DataLoader"):
         running_loss += loss.item()
         if i % 1000 == 999:
             last_loss = running_loss / 1000 # loss per batch
-            print(f'Lr {OPTIMIZER.param_groups[0]['lr']}  batch {i + 1} loss: {last_loss}')
+            print(f"Lr {OPTIMIZER.param_groups[0]['lr']}  batch {i + 1} loss: {last_loss}")
             tb_x = epoch_index * len(train_dl) + i + 1
             tb_writer.add_scalar('Loss/train', last_loss, tb_x)
             running_loss = 0.
