@@ -29,27 +29,33 @@ class ChessHeuristicEvaluator(nn.Module):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.heuristic = nn.Sequential(
-            nn.Conv2d(in_channels=12,out_channels=128, kernel_size=3, padding=1, stride=1),
+            nn.Conv2d(in_channels=12,out_channels=128, kernel_size=5, padding=2, stride=1),
             nn.BatchNorm2d(num_features=128),
             nn.ReLU(),
-            nn.Conv2d(in_channels=128,out_channels=256, kernel_size=3, padding=1, stride=1),
-            nn.BatchNorm2d(num_features=256),
-            nn.ReLU(),
-            nn.Conv2d(in_channels=256,out_channels=512, kernel_size=3, padding=1, stride=1),
+            nn.Conv2d(in_channels=128,out_channels=512, kernel_size=3, padding=1, stride=1),
             nn.BatchNorm2d(num_features=512),
             nn.ReLU(),
-            nn.Conv2d(in_channels=512,out_channels=128, kernel_size=3, padding=1, stride=1),
+            nn.Conv2d(in_channels=512,out_channels=256, kernel_size=3, padding=1, stride=1),
+            nn.BatchNorm2d(num_features=256),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=256,out_channels=128, kernel_size=3, padding=1, stride=1),
             nn.BatchNorm2d(num_features=128),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=128,out_channels=64, kernel_size=3, padding=1, stride=1),
+            nn.BatchNorm2d(num_features=64),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=32,out_channels=16, kernel_size=3, padding=1, stride=1),
+            nn.BatchNorm2d(num_features=16),
             nn.ReLU(),
             nn.Flatten(),
             nn.Dropout(p=0.2),
-            nn.Linear(128 * 8**2, 256),
+            nn.Linear(16 * 8**2, 256),
             nn.ReLU(),
             nn.Dropout(p=0.2),
             nn.Linear(256, 16),
             nn.ReLU(),
-            nn.Dropout(p=0.2),
             nn.Linear(16, 1),
+            nn.Tanh()
         )
     def forward(self, x):
         x = x.type(torch.float32)
@@ -61,9 +67,9 @@ model = ChessHeuristicEvaluator().to(DEVICE)
 EPOCHS = 200
 INITIAL_LEARNING_RATE = 0.001
 BATCH_SIZE = 256
-OPTIMIZER = torch.optim.Adam(model.parameters(), lr=INITIAL_LEARNING_RATE)
+OPTIMIZER = torch.optim.AdamW(model.parameters(), lr=INITIAL_LEARNING_RATE, weight_decay=0.00001)
 SCHEDULER = lr_schedulers.ReduceLROnPlateau(OPTIMIZER, mode='min', factor=0.1, patience=1)
-LOSS_FN = torch.nn.L1Loss()
+LOSS_FN = torch.nn.MSELoss()
 MODEL_PATH = "model_states/chess_heuristic_evaluator"
 DATASET_TRAIN_PATH = "preprocessed_data/chess_heuristic_evaluator_train_dataset"
 DATASET_TEST_PATH = "preprocessed_data/chess_heuristic_evaluator_test_dataset"
