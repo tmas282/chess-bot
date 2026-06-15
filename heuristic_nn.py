@@ -32,7 +32,7 @@ class ChessHeuristicEvaluator(nn.Module):
         self.heuristic = nn.Sequential(
             nn.Conv2d(in_channels=12,out_channels=128, kernel_size=3, padding=1, stride=1),
             nn.ReLU(),
-            nn.BatchNorm2d(num_features=256),
+            nn.BatchNorm2d(num_features=128),
             nn.Conv2d(in_channels=128,out_channels=256, kernel_size=3, padding=1, stride=1),
             nn.ReLU(),
             nn.BatchNorm2d(num_features=256),
