@@ -67,8 +67,8 @@ model = ChessHeuristicEvaluator().to(DEVICE)
 EPOCHS = 200
 INITIAL_LEARNING_RATE = 0.001
 BATCH_SIZE = 256
-OPTIMIZER = torch.optim.AdamW(model.parameters(), lr=INITIAL_LEARNING_RATE, weight_decay=0.00001)
-SCHEDULER = lr_schedulers.ReduceLROnPlateau(OPTIMIZER, mode='min', factor=0.1, patience=1)
+OPTIMIZER = torch.optim.AdamW(model.parameters(), lr=INITIAL_LEARNING_RATE, weight_decay=0.0001)
+SCHEDULER = lr_schedulers.StepLR(OPTIMIZER, step_size=5, gamma=0.5)
 LOSS_FN = torch.nn.MSELoss()
 MODEL_PATH = "model_states/chess_heuristic_evaluator"
 DATASET_TRAIN_PATH = "preprocessed_data/chess_heuristic_evaluator_train_dataset"
