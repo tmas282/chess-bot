@@ -186,7 +186,7 @@ def train(train_dl: "DataLoader", test_dl: "DataLoader"):
         avg_vloss = running_vloss / (i + 1)
         print(f'LOSS train {avg_loss} valid {avg_vloss}')
         
-        SCHEDULER.step(avg_vloss)
+        SCHEDULER.step()
         
         # Log the running loss averaged per batch
         # for both training and validation
