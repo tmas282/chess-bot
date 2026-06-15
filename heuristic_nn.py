@@ -76,7 +76,7 @@ def pre_process_df(df: polars.DataFrame):
     df = df.filter(~polars.col("Evaluation").str.contains("#"))
     df = df.filter((polars.col("Evaluation").cast(polars.Float32) <= 1000) & (polars.col("Evaluation").cast(polars.Int32) >= -1000))
     df = df.with_columns(
-        Evaluation=polars.col("Evaluation").cast(polars.Float32)
+        Evaluation=polars.col("Evaluation").cast(polars.Float32).map_batches(lambda x: np.tanh(x/200))
     )
     y = df.select(polars.col("Evaluation")).to_numpy()
     print("Normalizing FEN")
