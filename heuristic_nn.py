@@ -1,7 +1,6 @@
 import kagglehub
 import numpy as np
 import polars
-from sklearn.preprocessing import StandardScaler
 import torch
 import os
 from datetime import datetime
@@ -66,7 +65,6 @@ BATCH_SIZE = 256
 OPTIMIZER = torch.optim.Adam(model.parameters(), lr=INITIAL_LEARNING_RATE)
 SCHEDULER = lr_schedulers.ReduceLROnPlateau(OPTIMIZER, mode='min', factor=0.1, patience=1)
 LOSS_FN = torch.nn.L1Loss()
-SCALER = StandardScaler()
 MODEL_PATH = "model_states/chess_heuristic_evaluator"
 DATASET_TRAIN_PATH = "preprocessed_data/chess_heuristic_evaluator_train_dataset"
 DATASET_TEST_PATH = "preprocessed_data/chess_heuristic_evaluator_test_dataset"
@@ -83,9 +81,6 @@ def pre_process_df(df: polars.DataFrame):
     X = fens_to_arrays(df.select(polars.col("FEN")).to_numpy())
 
     X_train, X_test, y_train, y_test = normalize_split_data(X, y)
-
-    y_train = SCALER.fit_transform(y_train)
-    y_test = SCALER.transform(y_test)
 
     return X_train, X_test, y_train, y_test
 
