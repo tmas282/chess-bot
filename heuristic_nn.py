@@ -30,6 +30,7 @@ class ChessHeuristicEvaluator(nn.Module):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.heuristic = nn.Sequential(
+            nn.Dropout2d(p=0.2),
             nn.Conv2d(in_channels=12,out_channels=128, kernel_size=3, padding=1, stride=1),
             nn.ReLU(),
             nn.BatchNorm2d(num_features=128),
@@ -46,9 +47,13 @@ class ChessHeuristicEvaluator(nn.Module):
             nn.ReLU(),
             nn.BatchNorm2d(num_features=256),
             nn.Flatten(),
-            nn.Linear(256 * 8 * 8, 256),
+            nn.Linear(256 * 8 * 8, 8192),
             nn.ReLU(),
-            nn.Linear(256, 1)
+            nn.Linear(8192, 2048),
+            nn.ReLU(),
+            nn.Linear(2048, 512),
+            nn.ReLU(),
+            nn.Linear(512, 1),
         )
     def forward(self, x):
         x = x.type(torch.float32)
