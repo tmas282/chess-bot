@@ -30,16 +30,18 @@ class ChessHeuristicEvaluator(nn.Module):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.heuristic = nn.Sequential(
-            nn.Conv2d(in_channels=12,out_channels=256, kernel_size=3, padding=1, stride=1),
-            nn.ReLU(),
+            nn.Conv2d(in_channels=12,out_channels=512, kernel_size=3, padding=1, stride=1),
+            nn.Tanh(),
+            nn.Conv2d(in_channels=512,out_channels=256, kernel_size=3, padding=1, stride=1),
+            nn.Tanh(),
             nn.Conv2d(in_channels=256,out_channels=256, kernel_size=3, padding=1, stride=1),
-            nn.ReLU(),
-            nn.Conv2d(in_channels=256,out_channels=256, kernel_size=3, padding=1, stride=1),
-            nn.ReLU(),
+            nn.Tanh(),
             nn.Flatten(),
-            nn.Linear(256 * 8 * 8, 64),
-            nn.ReLU(),
-            nn.Linear(64, 1),
+            nn.Linear(256 * 8 * 8, 256),
+            nn.Tanh(),
+            nn.Linear(256, 256),
+            nn.Tanh(),
+            nn.Linear(256, 1)
         )
     def forward(self, x):
         x = x.type(torch.float32)
