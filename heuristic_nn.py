@@ -49,7 +49,7 @@ class ChessHeuristicEvaluator(nn.Module):
             nn.ReLU(),
             nn.Flatten(),
             nn.Dropout(p=0.2),
-            nn.Linear(128 * 4 * 4, 64),
+            nn.Linear(128 * 8 * 8, 64),
             nn.ReLU(),
             nn.Dropout(p=0.2),
             nn.Linear(64, 16),
