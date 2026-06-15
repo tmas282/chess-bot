@@ -51,7 +51,7 @@ class ChessHeuristicEvaluator(nn.Module):
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = ChessHeuristicEvaluator().to(DEVICE)
 EPOCHS = 200
-INITIAL_LEARNING_RATE = 0.01
+INITIAL_LEARNING_RATE = 0.001
 BATCH_SIZE = 256
 OPTIMIZER = torch.optim.Adam(model.parameters(), lr=INITIAL_LEARNING_RATE)
 SCHEDULER = lr_schedulers.ReduceLROnPlateau(OPTIMIZER, mode='min', factor=0.1, patience=1)
