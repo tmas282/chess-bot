@@ -15,7 +15,7 @@ def fen_to_array(fen: str | np.ndarray):
         res[12][0][0] = 1
 
     if fen_split[2] != "-":
-        for i,v in enumerate("K", 'Q', 'k', 'q'):
+        for i,v in enumerate(("K", 'Q', 'k', 'q')):
             if fen_split[2].find(v):
                 res[13][0][i] = 1
 
