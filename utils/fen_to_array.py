@@ -1,16 +1,25 @@
 import numpy as np
 
 def fens_to_arrays(fens: np.ndarray) -> np.ndarray:
-    vec = np.vectorize(fen_to_array, signature="(1)->(12,8,8)")
+    vec = np.vectorize(fen_to_array, signature="(1)->(14,8,8)")
     res = vec(fens)
     return res
 
 def fen_to_array(fen: str | np.ndarray):
     if(type(fen) == np.ndarray):
         fen = fen[0]
-    res = np.zeros(shape=(12,8,8),dtype=np.uint8)
+    res = np.zeros(shape=(14,8,8),dtype=np.uint8)
+    fen_split = fen.split(" ")
 
-    for r, col_v in enumerate(fen.split(" ")[0].split("/")):
+    if fen_split[1] == "w":
+        res[12][0][0] = 1
+
+    if fen_split[2] != "-":
+        for i,v in enumerate("K", 'Q', 'k', 'q'):
+            if fen_split[2].find(v):
+                res[13][0][i] = 1
+
+    for r, col_v in enumerate(fen_split[0].split("/")):
         c = 0
         for piece in col_v:
             try:
