@@ -28,28 +28,43 @@ class ChessHeuristicDataset(Dataset):
 class ChessHeuristicEvaluator(nn.Module):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.heuristic = nn.Sequential(
-            nn.Conv2d(in_channels=14,out_channels=128, kernel_size=5, padding=2, stride=1),
-            nn.BatchNorm2d(num_features=128),
+        self.conv1 = nn.Sequential(
+            nn.Conv2d(in_channels=14,out_channels=32, kernel_size=5, padding=2, stride=1),
+            nn.BatchNorm2d(num_features=32),
             nn.ReLU(),
-            nn.Conv2d(in_channels=128,out_channels=256, kernel_size=5, padding=2, stride=1),
+            nn.Conv2d(in_channels=32,out_channels=32, kernel_size=5, padding=2, stride=1),
+            nn.BatchNorm2d(num_features=32),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=32,out_channels=32, kernel_size=3, padding=1, stride=1),
+            nn.BatchNorm2d(num_features=32),
+            nn.ReLU(),
+        )
+        self.conv2 = nn.Sequential(
+            nn.Conv2d(in_channels=(14+32),out_channels=64, kernel_size=5, padding=2, stride=1),
+            nn.BatchNorm2d(num_features=64),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=64,out_channels=64, kernel_size=3, padding=1, stride=1),
+            nn.BatchNorm2d(num_features=64),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=64,out_channels=64, kernel_size=3, padding=1, stride=1),
+            nn.BatchNorm2d(num_features=64),
+            nn.ReLU(),
+        )
+        self.conv3 = nn.Sequential(
+            nn.Conv2d(in_channels=(14+64),out_channels=256, kernel_size=3, padding=1, stride=1),
+            nn.BatchNorm2d(num_features=256),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=256,out_channels=256, kernel_size=3, padding=1, stride=1),
             nn.BatchNorm2d(num_features=256),
             nn.ReLU(),
             nn.Conv2d(in_channels=256,out_channels=128, kernel_size=3, padding=1, stride=1),
             nn.BatchNorm2d(num_features=128),
             nn.ReLU(),
-            nn.Conv2d(in_channels=128,out_channels=128, kernel_size=3, padding=1, stride=1),
-            nn.BatchNorm2d(num_features=128),
-            nn.ReLU(),
-            nn.Conv2d(in_channels=128,out_channels=64, kernel_size=3, padding=1, stride=1),
-            nn.BatchNorm2d(num_features=64),
-            nn.ReLU(),
-            nn.Conv2d(in_channels=64,out_channels=16, kernel_size=3, padding=1, stride=1),
-            nn.BatchNorm2d(num_features=16),
-            nn.ReLU(),
+        )
+        self.heuristic = nn.Sequential(
             nn.Flatten(),
             nn.Dropout(p=0.5),
-            nn.Linear(16 * 8**2, 256),
+            nn.Linear(128 * 8**2 + 14 * 8**2, 256),
             nn.ReLU(),
             nn.Dropout(p=0.5),
             nn.Linear(256, 16),
@@ -59,7 +74,10 @@ class ChessHeuristicEvaluator(nn.Module):
         )
     def forward(self, x):
         x = x.type(torch.float32)
-        logits = self.heuristic(x)
+        res_conv1 = self.conv1(x)
+        res_conv2 = self.conv2(torch.concatenate((res_conv1, x), dim=1 ))
+        res_conv3 = self.conv3(torch.concatenate((res_conv2, x), dim=1 ))
+        logits = self.heuristic(torch.concatenate((res_conv3, x), dim=1 )) #dim=1 : channels
         return logits
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
