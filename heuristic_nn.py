@@ -82,7 +82,7 @@ class ChessHeuristicEvaluator(nn.Module):
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = ChessHeuristicEvaluator().to(DEVICE)
-EPOCHS = 200
+EPOCHS = 50
 INITIAL_LEARNING_RATE = 0.001
 BATCH_SIZE = 256
 OPTIMIZER = torch.optim.AdamW(model.parameters(), lr=INITIAL_LEARNING_RATE, weight_decay=0.001)
@@ -94,13 +94,15 @@ DATASET_TEST_PATH = "preprocessed_data/chess_heuristic_evaluator_test_dataset"
 
 def pre_process_df(df: polars.DataFrame):
     print("Normalizing Final Evaluation")
-    df = df.filter(~polars.col("Evaluation").str.contains("#"))
     df = df.with_columns(
-        Evaluation=polars.col("Evaluation").cast(polars.Float32).map_batches(lambda x: np.tanh(x/200))
+        Evaluation=polars.when(polars.col("mate").is_null())
+            .then(polars.col("cp").cast(polars.Float32).map_batches(lambda x: np.tanh(x/200)))
+            .otherwise(polars.col("mate").cast(polars.Float32).sign())
+
     )
     y = df.select(polars.col("Evaluation")).to_numpy()
     print("Normalizing FEN")
-    X = fens_to_arrays(df.select(polars.col("FEN")).to_numpy())
+    X = fens_to_arrays(df.select(polars.col("fen")).to_numpy())
 
     X_train, X_test, y_train, y_test = normalize_split_data(X, y)
 
@@ -116,10 +118,10 @@ def get_datasets():
     arrs = get_saved_arrays(DATASET_TRAIN_PATH, DATASET_TEST_PATH)
     if arrs is None:
         print("Getting dataset")
-        abs_path = kagglehub.dataset_download("ronakbadhe/chess-evaluations")
-        path = os.path.join(abs_path, "chessData.csv")
+        abs_path = kagglehub.dataset_download("mateuszgrzybpl/lichess-chess-positions-ml-ready-and-deduplicated")
+        path = os.path.join(abs_path, "*.parquet")
         print("Reading dataset")
-        df = polars.read_csv(path)
+        df = polars.read_parquet(path)
         print("Preprocessing dataset")
         arrs = pre_process_df(df=df)
         save_arrays(DATASET_TRAIN_PATH, DATASET_TEST_PATH, arrs[0], arrs[1], arrs[2], arrs[3])
@@ -140,6 +142,7 @@ def create_dataloaders(train_dataset: 'ChessHeuristicDataset', test_dataset: 'Ch
 def train_one_epoch(epoch_index, tb_writer, train_dl: "DataLoader"):
     running_loss = 0.
     last_loss = 0.
+    avg_loss, n_avg = 0
 
     # Here, we use enumerate(training_loader) instead of
     # iter(training_loader) so that we can track the batch
@@ -164,12 +167,14 @@ def train_one_epoch(epoch_index, tb_writer, train_dl: "DataLoader"):
         running_loss += loss.item()
         if i % 1000 == 999:
             last_loss = running_loss / 1000 # loss per batch
+            avg_loss = avg_loss + last_loss
+            n_avg = n_avg + 1
             print(f"Lr {OPTIMIZER.param_groups[0]['lr']}  batch {i + 1} loss: {last_loss}")
             tb_x = epoch_index * len(train_dl) + i + 1
             tb_writer.add_scalar('Loss/train', last_loss, tb_x)
             running_loss = 0.
 
-    return last_loss
+    return avg_loss / n_avg
  
 def train(train_dl: "DataLoader", test_dl: "DataLoader"):
     # Initializing in a separate cell so we can easily add more epochs to the same run
@@ -202,7 +207,7 @@ def train(train_dl: "DataLoader", test_dl: "DataLoader"):
                 running_vloss += vloss
 
         avg_vloss = running_vloss / (i + 1)
-        print(f'LOSS train {avg_loss} valid {avg_vloss}')
+        print(f'LOSS: avg train {avg_loss} && avg validation {avg_vloss}')
         
         SCHEDULER.step()
         
