@@ -115,7 +115,7 @@ def normalize_split_data(X: np.ndarray, y: np.ndarray):
     return X_train, X_test, y_train, y_test
 
 def get_datasets():
-    arrs = get_saved_arrays(DATASET_TRAIN_PATH, DATASET_TEST_PATH)
+    arrs = get_saved_arrays(DATASET_TRAIN_PATH, DATASET_TEST_PATH, 10)
     if arrs is None:
         print("Getting dataset")
         abs_path = kagglehub.dataset_download("mateuszgrzybpl/lichess-chess-positions-ml-ready-and-deduplicated")
@@ -127,7 +127,7 @@ def get_datasets():
             arrs = pre_process_df(df=df)
             save_sub_array(DATASET_TRAIN_PATH, DATASET_TEST_PATH, i, arrs[0], arrs[1], arrs[2], arrs[3])
             del arrs
-        arrs = get_saved_arrays(DATASET_TRAIN_PATH, DATASET_TEST_PATH)
+        arrs = get_saved_arrays(DATASET_TRAIN_PATH, DATASET_TEST_PATH, 10)
     else:
         print("Preprocessing skipped, using saved normalization")
     print("Creating Datasets and Dataloaders")
