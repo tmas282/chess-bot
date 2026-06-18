@@ -12,7 +12,7 @@ from sklearn.model_selection import train_test_split
 
 from utils.fen_to_array import fens_to_arrays
 from utils.model_files import create_model_state_folder
-from utils.numpy_array_files import get_saved_arrays, save_arrays
+from utils.numpy_array_files import get_saved_arrays, save_sub_array
 
 class ChessHeuristicDataset(Dataset):
     def __init__(self, features, targets):
@@ -119,19 +119,15 @@ def get_datasets():
     if arrs is None:
         print("Getting dataset")
         abs_path = kagglehub.dataset_download("mateuszgrzybpl/lichess-chess-positions-ml-ready-and-deduplicated")
-        arrs = [None, None, None, None]
         for i in np.arange(10):
             path = os.path.join(abs_path, f"train-{i:05d}.parquet")
             print(f"Reading dataset {i}")
             df = polars.read_parquet(path)
             print("Preprocessing dataset")
-            arrs_subset = pre_process_df(df=df)
-            for k in np.arange(4):
-                if(arrs[k] is None):
-                    arrs[k] = arrs_subset[k]
-                else:
-                    arrs[k] = np.concatenate(arrs[k], arrs_subset[k])
-        save_arrays(DATASET_TRAIN_PATH, DATASET_TEST_PATH, arrs[0], arrs[1], arrs[2], arrs[3])
+            arrs = pre_process_df(df=df)
+            save_sub_array(DATASET_TRAIN_PATH, DATASET_TEST_PATH, i, arrs[0], arrs[1], arrs[2], arrs[3])
+            del arrs
+        arrs = get_saved_arrays(DATASET_TRAIN_PATH, DATASET_TEST_PATH)
     else:
         print("Preprocessing skipped, using saved normalization")
     print("Creating Datasets and Dataloaders")
