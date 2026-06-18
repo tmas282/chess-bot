@@ -137,13 +137,15 @@ def create_dataset(X, y):
     return ds
 
 def create_dataloader(dataset, shuffle=False):
+    print("Creating Dataloader")
     dl = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=shuffle, pin_memory=True, num_workers=4)
     return dl
 
 def train_one_epoch(train_dl: "DataLoader"):
     running_loss = 0.
     last_loss = 0.
-    avg_loss, n_avg = 0
+    avg_loss = 0.0
+    n_avg = 0
     for i, data in enumerate(train_dl):
         inputs, labels = data
         inputs, labels = inputs.to(DEVICE), labels.to(DEVICE)
