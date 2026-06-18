@@ -119,7 +119,7 @@ def get_datasets():
     if arrs is None:
         print("Getting dataset")
         abs_path = kagglehub.dataset_download("mateuszgrzybpl/lichess-chess-positions-ml-ready-and-deduplicated")
-        arrs = (None, None, None, None)
+        arrs = [None, None, None, None]
         for i in np.arange(10):
             path = os.path.join(abs_path, f"train-{i:05d}.parquet")
             print(f"Reading dataset {i}")
