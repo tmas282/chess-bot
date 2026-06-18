@@ -201,6 +201,7 @@ def train():
 def start_training():
     print(f"DEVICE={DEVICE}\nINITIAL_LEARNING_RATE={INITIAL_LEARNING_RATE}\nEPOCHS={EPOCHS}\nBATCH_SIZE={BATCH_SIZE}")
     create_model_state_folder(MODEL_PATH)
+    pre_process_data()
     train()
 
 if __name__ == "__main__":
