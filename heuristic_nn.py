@@ -13,7 +13,7 @@ from sklearn.model_selection import train_test_split
 from utils.fen_to_array import fen_to_array
 from utils.log_loss_csv import write_to_file
 from utils.model_files import create_model_state_folder
-from utils.numpy_array_files import get_saved_array, get_saved_arrays, preprocessed_state_exists, save_sub_array
+from utils.numpy_array_files import get_saved_array, preprocessed_state_exists, save_sub_array
 
 class ChessHeuristicDataset(Dataset):
     def __init__(self, features, targets):
