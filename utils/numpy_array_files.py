@@ -1,41 +1,26 @@
 import numpy as np, os
 
-def get_saved_arrays(dataset_train_path: str, dataset_test_path: str, total: int):
+def preprocessed_state_exists(dataset_train_path: str, dataset_test_path: str, total: int):
+    for i in np.arange(total):
+        expected_files = [
+            f"{dataset_train_path}_X_{i}.npy",
+            f"{dataset_test_path}_X_{i}.npy",
+            f"{dataset_train_path}_y_{i}.npy",
+            f"{dataset_test_path}_y_{i}.npy"
+        ]
+        
+        for file_path in expected_files:
+            if not os.path.exists(file_path):
+                print(f"Missing file detected: {file_path}")
+                return False
+                
+    return True
+
+def get_saved_array(path: str, index: int):
     try:
-        X_train_list = []
-        X_test_list = []
-        y_train_list = []
-        y_test_list = []
-        
-        for i in range(total):
-            X_train_i = np.load(f"{dataset_train_path}_X_{i}.npy", allow_pickle=True)
-            X_train_list.append(X_train_i)
-            del X_train_i
-            
-            X_test_i = np.load(f"{dataset_test_path}_X_{i}.npy", allow_pickle=True)
-            X_test_list.append(X_test_i)
-            del X_test_i
-            
-            y_train_i = np.load(f"{dataset_train_path}_y_{i}.npy", allow_pickle=True)
-            y_train_list.append(y_train_i)
-            del y_train_i
-            
-            y_test_i = np.load(f"{dataset_test_path}_y_{i}.npy", allow_pickle=True)
-            y_test_list.append(y_test_i)
-            del y_test_i
-            
-        print("All chunks loaded. Concatenating into final arrays...")
-    
-        X_train = np.concatenate(X_train_list, axis=0)
-        del X_train_list
-        X_test = np.concatenate(X_test_list, axis=0)
-        del X_test_list
-        y_train = np.concatenate(y_train_list, axis=0)
-        del y_train_list
-        y_test = np.concatenate(y_test_list, axis=0)
-        del y_test_list
-        
-        return X_train, X_test, y_train, y_test
+        X = np.load(f"{path}_X_{index}.npy", allow_pickle=True)
+        y = np.load(f"{path}_y_{index}.npy", allow_pickle=True)
+        return X, y
     except Exception as e:
         exception_name = type(e).__name__
         print(f"Exception caught: {exception_name}")
