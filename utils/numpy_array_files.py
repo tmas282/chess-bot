@@ -8,15 +8,22 @@ def get_saved_arrays(dataset_train_path: str, dataset_test_path: str, total: int
         y_test_list = []
         
         for i in range(total):
-            with np.load(f"{dataset_train_path}_X_{i}.npy", allow_pickle=True) as f:
-                X_train_list.append(f)
-            with np.load(f"{dataset_test_path}_X_{i}.npy", allow_pickle=True) as f:
-                X_test_list.append(f)
-            with np.load(f"{dataset_train_path}_y_{i}.npy", allow_pickle=True) as f:
-                y_train_list.append(f)
-            with np.load(f"{dataset_test_path}_y_{i}.npy", allow_pickle=True) as f:
-                y_test_list.append(f)
-
+            X_train_i = np.load(f"{dataset_train_path}_X_{i}.npy", allow_pickle=True)
+            X_train_list.append(X_train_i)
+            del X_train_i
+            
+            X_test_i = np.load(f"{dataset_test_path}_X_{i}.npy", allow_pickle=True)
+            X_test_list.append(X_test_i)
+            del X_test_i
+            
+            y_train_i = np.load(f"{dataset_train_path}_y_{i}.npy", allow_pickle=True)
+            y_train_list.append(y_train_i)
+            del y_train_i
+            
+            y_test_i = np.load(f"{dataset_test_path}_y_{i}.npy", allow_pickle=True)
+            y_test_list.append(y_test_i)
+            del y_test_i
+            
         print("All chunks loaded. Concatenating into final arrays...")
     
         X_train = np.concatenate(X_train_list, axis=0)
