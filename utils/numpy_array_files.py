@@ -37,6 +37,8 @@ def get_saved_arrays(dataset_train_path: str, dataset_test_path: str, total: int
         
         return X_train, X_test, y_train, y_test
     except Exception as e:
+        exception_name = type(e).__name__
+        print(f"Exception caught: {exception_name}")
         print(e)
         return None
     
