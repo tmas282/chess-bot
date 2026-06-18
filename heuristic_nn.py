@@ -173,6 +173,7 @@ def train():
         avg_tloss = 0.0
         avg_vloss = 0.0
         for j in range(CHUNKS):
+            print(f'CHUNK {j + 1}:')
             X, y = get_saved_array(DATASET_TRAIN_PATH, j)
             ds = create_dataset(X, y)
             train_dl = create_dataloader(ds, shuffle=True)
@@ -191,6 +192,7 @@ def train():
                     vloss = LOSS_FN(voutputs, vlabels)
                     running_vloss += vloss
             avg_vloss = running_vloss / (i + 1)
+            print(f'Avg validation {avg_vloss}')
         print(f'LOSS: avg train {avg_tloss / CHUNKS} && avg validation {avg_vloss / CHUNKS}')
         SCHEDULER.step()
         if avg_vloss < best_vloss:
