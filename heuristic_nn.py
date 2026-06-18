@@ -84,12 +84,12 @@ class ChessHeuristicEvaluator(nn.Module):
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = ChessHeuristicEvaluator().to(DEVICE)
-EPOCHS = 10
+EPOCHS = 20
 CHUNKS = 10
 INITIAL_LEARNING_RATE = 0.001
 BATCH_SIZE = 1024
 OPTIMIZER = torch.optim.AdamW(model.parameters(), lr=INITIAL_LEARNING_RATE, weight_decay=0.001)
-SCHEDULER = lr_schedulers.StepLR(OPTIMIZER, step_size=1, gamma=0.5)
+SCHEDULER = lr_schedulers.StepLR(OPTIMIZER, step_size=5, gamma=0.5)
 LOSS_FN = torch.nn.MSELoss()
 MODEL_PATH = "model_states/chess_heuristic_evaluator"
 DATASET_TRAIN_PATH = "preprocessed_data/chess_heuristic_evaluator_train_dataset"
