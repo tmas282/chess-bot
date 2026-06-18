@@ -1,7 +1,14 @@
 import csv
 
-def write_to_file(epoch: int, tloss: float, vloss: int):
-    with open('log_loss.csv', 'a', newline='') as csvfile:
-        fieldnames = ['epoch','tloss', 'vloss']
+def write_train(epoch: int, chunk: int, batch: int, tloss: float):
+    with open('log_tloss.csv', 'a', newline='') as csvfile:
+        fieldnames = ['epoch', 'chunk', 'batch', 'tloss']
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-        writer.writerow({'epoch': epoch, 'tloss':tloss, 'vloss': vloss})
+        writer.writeheader()
+        writer.writerow({'epoch': epoch, 'chunk': chunk, 'batch': batch, 'tloss': tloss})
+def write_validation(epoch: int, chunk: int, vloss: float):
+    with open('log_vloss.csv', 'a', newline='') as csvfile:
+        fieldnames = ['epoch', 'chunk', 'vloss']
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerow({'epoch': epoch, 'chunk': chunk, 'vloss': vloss})

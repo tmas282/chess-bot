@@ -11,7 +11,7 @@ from torch.utils.tensorboard.writer import SummaryWriter #tensorboard --logdir=r
 from sklearn.model_selection import train_test_split
 
 from utils.fen_to_array import fen_to_array
-from utils.log_loss_csv import write_to_file
+from utils.log_loss_csv import write_to_file, write_train, write_validation
 from utils.model_files import create_model_state_folder
 from utils.numpy_array_files import get_saved_array, preprocessed_state_exists, save_sub_array
 
@@ -84,12 +84,12 @@ class ChessHeuristicEvaluator(nn.Module):
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = ChessHeuristicEvaluator().to(DEVICE)
-EPOCHS = 20
+EPOCHS = 10
 CHUNKS = 10
 INITIAL_LEARNING_RATE = 0.001
 BATCH_SIZE = 1024
 OPTIMIZER = torch.optim.AdamW(model.parameters(), lr=INITIAL_LEARNING_RATE, weight_decay=0.001)
-SCHEDULER = lr_schedulers.StepLR(OPTIMIZER, step_size=5, gamma=0.5)
+SCHEDULER = lr_schedulers.StepLR(OPTIMIZER, step_size=1, gamma=0.5)
 LOSS_FN = torch.nn.MSELoss()
 MODEL_PATH = "model_states/chess_heuristic_evaluator"
 DATASET_TRAIN_PATH = "preprocessed_data/chess_heuristic_evaluator_train_dataset"
@@ -141,7 +141,7 @@ def create_dataloader(dataset, shuffle=False):
     dl = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=shuffle, pin_memory=True, num_workers=4)
     return dl
 
-def train_one_epoch(train_dl: "DataLoader"):
+def train_one_epoch(epoch_i: int, chunk_i: int, train_dl: "DataLoader"):
     running_loss = 0.
     last_loss = 0.
     avg_loss = 0.0
@@ -160,6 +160,7 @@ def train_one_epoch(train_dl: "DataLoader"):
             avg_loss = avg_loss + last_loss
             n_avg = n_avg + 1
             print(f"Lr {OPTIMIZER.param_groups[0]['lr']}  batch {i + 1} loss: {last_loss}")
+            write_train(epoch_i, chunk_i, i, float(running_loss))
             running_loss = 0.
 
     return avg_loss / n_avg
@@ -191,15 +192,15 @@ def train():
                     voutputs = model(vinputs)
                     vloss = LOSS_FN(voutputs, vlabels)
                     running_vloss += vloss
-            avg_vloss = running_vloss / (i + 1)
+            avg_vloss += running_vloss / (i + 1)
             print(f'Avg validation {avg_vloss}')
+            write_validation(epoch, j, float(avg_vloss))
         print(f'LOSS: avg train {avg_tloss / CHUNKS} && avg validation {avg_vloss / CHUNKS}')
         SCHEDULER.step()
         if avg_vloss < best_vloss:
             best_vloss = avg_vloss
             model_path = f'{MODEL_PATH}_{timestamp}_{epoch}'
             torch.save(model.state_dict(), model_path)
-        write_to_file(epoch, avg_tloss, avg_vloss)
     print("Ended Training")
 
 def start_training():
