@@ -179,7 +179,7 @@ def train():
             model.train(True)
             avg_tloss += train_one_epoch(train_dl)
             running_vloss = 0.0
-            X, y = get_saved_array(DATASET_TEST_PATH)
+            X, y = get_saved_array(DATASET_TEST_PATH, j)
             ds = create_dataset(X, y)
             test_dl = create_dataloader(ds, shuffle=False)
             model.eval()
