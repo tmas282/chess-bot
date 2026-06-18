@@ -8,10 +8,10 @@ def get_saved_arrays(dataset_train_path: str, dataset_test_path: str, total: int
         y_test_list = []
         
         for i in range(total):
-            X_train_list.append(np.load(f"{dataset_train_path}_X_{i}.npy"))
-            X_test_list.append(np.load(f"{dataset_test_path}_X_{i}.npy"))
-            y_train_list.append(np.load(f"{dataset_train_path}_y_{i}.npy"))
-            y_test_list.append(np.load(f"{dataset_test_path}_y_{i}.npy"))
+            X_train_list.append(np.load(f"{dataset_train_path}_X_{i}.npy", allow_pickle=True))
+            X_test_list.append(np.load(f"{dataset_test_path}_X_{i}.npy", allow_pickle=True))
+            y_train_list.append(np.load(f"{dataset_train_path}_y_{i}.npy", allow_pickle=True))
+            y_test_list.append(np.load(f"{dataset_test_path}_y_{i}.npy", allow_pickle=True))
             
         print("All chunks loaded. Concatenating into final arrays...")
     
@@ -31,7 +31,7 @@ def save_sub_array(dataset_train_path: str, dataset_test_path: str, index: int, 
     except:
         pass
     finally:
-        np.save(f"{dataset_train_path}_X_{index}.npy", X_train)
-        np.save(f"{dataset_test_path}_X_{index}.npy", X_test)
-        np.save(f"{dataset_train_path}_y_{index}.npy", y_train)
-        np.save(f"{dataset_test_path}_y_{index}.npy", y_test)
+        np.save(f"{dataset_train_path}_X_{index}.npy", X_train, allow_pickle=True)
+        np.save(f"{dataset_test_path}_X_{index}.npy", X_test, allow_pickle=True)
+        np.save(f"{dataset_train_path}_y_{index}.npy", y_train, allow_pickle=True)
+        np.save(f"{dataset_test_path}_y_{index}.npy", y_test, allow_pickle=True)
