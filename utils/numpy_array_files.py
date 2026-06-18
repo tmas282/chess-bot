@@ -8,13 +8,13 @@ def get_saved_arrays(dataset_train_path: str, dataset_test_path: str, total: int
         y_test_list = []
         
         for i in range(total):
-            with np.load(f"{dataset_train_path}_X_{i}.npy", allow_pickle=True, mmap_mode="r") as f:
+            with np.load(f"{dataset_train_path}_X_{i}.npy", allow_pickle=True) as f:
                 X_train_i = f
-            with np.load(f"{dataset_test_path}_X_{i}.npy", allow_pickle=True, mmap_mode="r") as f:
+            with np.load(f"{dataset_test_path}_X_{i}.npy", allow_pickle=True) as f:
                 X_test_i = f
-            with np.load(f"{dataset_train_path}_y_{i}.npy", allow_pickle=True, mmap_mode="r") as f:
+            with np.load(f"{dataset_train_path}_y_{i}.npy", allow_pickle=True) as f:
                 y_train_i = f
-            with np.load(f"{dataset_test_path}_y_{i}.npy", allow_pickle=True, mmap_mode="r") as f:
+            with np.load(f"{dataset_test_path}_y_{i}.npy", allow_pickle=True) as f:
                 y_test_i = f
             
             X_train_list.append(X_train_i)
