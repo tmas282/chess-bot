@@ -7,11 +7,10 @@ from datetime import datetime
 from torch.utils.data import DataLoader, Dataset
 from torch import nn
 import torch.optim.lr_scheduler as lr_schedulers
-from torch.utils.tensorboard.writer import SummaryWriter #tensorboard --logdir=runs
 from sklearn.model_selection import train_test_split
 
 from utils.fen_to_array import fen_to_array
-from utils.log_loss_csv import write_to_file, write_train, write_validation
+from utils.log_loss_csv import write_train, write_validation
 from utils.model_files import create_model_state_folder
 from utils.numpy_array_files import get_saved_array, preprocessed_state_exists, save_sub_array
 
