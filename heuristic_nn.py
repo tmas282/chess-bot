@@ -121,7 +121,7 @@ def get_datasets():
         abs_path = kagglehub.dataset_download("mateuszgrzybpl/lichess-chess-positions-ml-ready-and-deduplicated")
         arrs = (None, None, None, None)
         for i in np.arange(10):
-            path = os.path.join(abs_path, "train-00001.parquet")
+            path = os.path.join(abs_path, f"train-{i:05d}.parquet")
             print(f"Reading dataset {i}")
             df = polars.read_parquet(path)
             print("Preprocessing dataset")
