@@ -119,11 +119,18 @@ def get_datasets():
     if arrs is None:
         print("Getting dataset")
         abs_path = kagglehub.dataset_download("mateuszgrzybpl/lichess-chess-positions-ml-ready-and-deduplicated")
-        path = os.path.join(abs_path, "*.parquet")
-        print("Reading dataset")
-        df = polars.read_parquet(path)
-        print("Preprocessing dataset")
-        arrs = pre_process_df(df=df)
+        arrs = (None, None, None, None)
+        for i in np.arange(10):
+            path = os.path.join(abs_path, "train-00001.parquet")
+            print(f"Reading dataset {i}")
+            df = polars.read_parquet(path)
+            print("Preprocessing dataset")
+            arrs_subset = pre_process_df(df=df)
+            for k in np.arange(4):
+                if(arrs[k] is None):
+                    arrs[k] = arrs_subset[k]
+                else:
+                    arrs[k] = np.concatenate(arrs[k], arrs_subset[k])
         save_arrays(DATASET_TRAIN_PATH, DATASET_TEST_PATH, arrs[0], arrs[1], arrs[2], arrs[3])
     else:
         print("Preprocessing skipped, using saved normalization")
