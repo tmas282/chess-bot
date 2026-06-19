@@ -116,7 +116,7 @@ def normalize_split_data(X: np.ndarray, y: np.ndarray):
     return X_train, X_test, y_train, y_test
 
 def pre_process_data():
-    if preprocessed_state_exists(DATASET_TRAIN_PATH, DATASET_TEST_PATH, 10) == False:
+    if preprocessed_state_exists(DATASET_TRAIN_PATH, DATASET_TEST_PATH, CHUNKS) == False:
         print("Getting dataset")
         abs_path = kagglehub.dataset_download("mateuszgrzybpl/lichess-chess-positions-ml-ready-and-deduplicated")
         for i in range(CHUNKS):
@@ -125,6 +125,7 @@ def pre_process_data():
             df = polars.read_parquet(path)
             print("Preprocessing dataset")
             arrs = pre_process_df(df=df)
+            del df
             save_sub_array(DATASET_TRAIN_PATH, DATASET_TEST_PATH, i, arrs[0], arrs[1], arrs[2], arrs[3])
             del arrs
     else:
