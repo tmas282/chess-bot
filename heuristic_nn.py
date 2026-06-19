@@ -102,6 +102,7 @@ def pre_process_df(df: polars.DataFrame):
             .otherwise(polars.col("mate").cast(polars.Float32).sign())
     )
     y = df.select(polars.col("Evaluation")).to_numpy()
+    print("Normalizing FEN")
     X = fens_to_arrays(df.select(polars.col("fen")).to_numpy())
 
     X_train, X_test, y_train, y_test = normalize_split_data(X, y)
