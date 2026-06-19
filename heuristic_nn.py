@@ -179,6 +179,7 @@ def train():
             train_dl = create_dataloader(ds, shuffle=True)
             model.train(True)
             avg_tloss += train_one_epoch(epoch, j, train_dl)
+            del train_dl
             running_vloss = 0.0
             ds = create_dataset(X_test, y_test)
             test_dl = create_dataloader(ds, shuffle=False)
@@ -190,6 +191,8 @@ def train():
                     voutputs = model(vinputs)
                     vloss = LOSS_FN(voutputs, vlabels)
                     running_vloss += vloss
+            del ds
+            del test_dl
             chunk_vloss = running_vloss / (i + 1)
             avg_vloss += chunk_vloss
             print(f'Avg validation {chunk_vloss}')
