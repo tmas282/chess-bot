@@ -191,13 +191,16 @@ def train():
                     voutputs = model(vinputs)
                     vloss = LOSS_FN(voutputs, vlabels)
                     running_vloss += vloss
-            avg_vloss += running_vloss / (i + 1)
+            chunk_vloss = running_vloss / (i + 1)
+            avg_vloss += chunk_vloss
             print(f'Avg validation {avg_vloss}')
-            write_validation(epoch, j, float(avg_vloss))
-        print(f'LOSS: avg train {avg_tloss / CHUNKS} && avg validation {avg_vloss / CHUNKS}')
+            write_validation(epoch, j, float(chunk_vloss))
+        epoch_avg_tloss = avg_tloss / CHUNKS
+        epoch_avg_vloss = avg_vloss / CHUNKS
+        print(f'LOSS: avg train {epoch_avg_tloss} && avg validation {epoch_avg_vloss}')
         SCHEDULER.step()
-        if avg_vloss < best_vloss:
-            best_vloss = avg_vloss
+        if epoch_avg_vloss < best_vloss:
+            best_vloss = epoch_avg_vloss
             model_path = f'{MODEL_PATH}_{timestamp}_{epoch}'
             torch.save(model.state_dict(), model_path)
     print("Ended Training")
