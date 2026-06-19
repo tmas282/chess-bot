@@ -9,7 +9,7 @@ from torch import nn
 import torch.optim.lr_scheduler as lr_schedulers
 from sklearn.model_selection import train_test_split
 
-from utils.fen_to_array import fen_to_array
+from utils.fen_to_array import fen_to_array, fens_to_arrays
 from utils.log_loss_csv import write_train, write_validation
 from utils.model_files import create_model_state_folder
 from utils.numpy_array_files import get_saved_array, preprocessed_state_exists, save_sub_array
@@ -23,7 +23,7 @@ class ChessHeuristicDataset(Dataset):
         return len(self.X)
  
     def __getitem__(self, idx):
-        x = torch.tensor(fen_to_array(self.X[idx]))
+        x = torch.tensor(self.X[idx])
         y = torch.tensor(self.y[idx])
         return x, y
     
@@ -100,10 +100,9 @@ def pre_process_df(df: polars.DataFrame):
         Evaluation=polars.when(polars.col("mate").is_null())
             .then(polars.col("cp").cast(polars.Float32).map_batches(lambda x: np.tanh(x/200)))
             .otherwise(polars.col("mate").cast(polars.Float32).sign())
-
     )
     y = df.select(polars.col("Evaluation")).to_numpy()
-    X = df.select(polars.col("fen")).to_numpy().reshape(-1, 1)
+    X = fens_to_arrays(df.select(polars.col("fen")).to_numpy())
 
     X_train, X_test, y_train, y_test = normalize_split_data(X, y)
 
