@@ -8,7 +8,7 @@ def fens_to_arrays(fens: np.ndarray) -> np.ndarray:
 def fen_to_array(fen: str | np.ndarray):
     if(type(fen) == np.ndarray):
         fen = fen[0]
-    res = np.zeros(shape=(14,8,8),dtype=np.float32)
+    res = np.zeros(shape=(14,8,8),dtype=np.uint8)
     fen_split = fen.split(" ")
 
     if fen_split[1] == "w":

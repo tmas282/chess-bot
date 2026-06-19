@@ -23,7 +23,7 @@ class ChessHeuristicDataset(Dataset):
         return len(self.X)
  
     def __getitem__(self, idx):
-        x = torch.tensor(self.X[idx])
+        x = torch.tensor(self.X[idx], dtype=torch.float32)
         y = torch.tensor(self.y[idx])
         return x, y
     
