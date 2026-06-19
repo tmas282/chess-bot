@@ -159,7 +159,7 @@ def train_one_epoch(epoch_i: int, chunk_i: int, train_dl: "DataLoader"):
             avg_loss = avg_loss + last_loss
             n_avg = n_avg + 1
             print(f"Lr {OPTIMIZER.param_groups[0]['lr']}  batch {i + 1} loss: {last_loss}")
-            write_train(epoch_i, chunk_i, i, float(running_loss))
+            write_train(epoch_i, chunk_i, i, running_loss)
             running_loss = 0.
 
     return avg_loss / n_avg
@@ -193,7 +193,7 @@ def train():
                     running_vloss += vloss
             chunk_vloss = running_vloss / (i + 1)
             avg_vloss += chunk_vloss
-            print(f'Avg validation {avg_vloss}')
+            print(f'Avg validation {chunk_vloss}')
             write_validation(epoch, j, float(chunk_vloss))
         epoch_avg_tloss = avg_tloss / CHUNKS
         epoch_avg_vloss = avg_vloss / CHUNKS
