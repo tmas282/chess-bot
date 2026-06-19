@@ -117,7 +117,7 @@ def normalize_split_data(X: np.ndarray, y: np.ndarray):
 def pre_process_data():
     if preprocessed_state_exists(PREPROCESSED_DATA_PATH, CHUNKS) == False:
         print("Getting dataset")
-        abs_path = kagglehub.dataset_download("mateuszgrzybpl/lichess-chess-positions-ml-ready-and-deduplicated")
+        abs_path = kagglehub.dataset_download("mateuszgrzybpl/lichess-chess-positions-ml-ready-and-deduplicated", output_dir="./")
         for i in range(CHUNKS):
             path = os.path.join(abs_path, f"train-{i:05d}.parquet")
             print(f"Reading dataset {i}")
