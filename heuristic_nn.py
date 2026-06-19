@@ -12,7 +12,7 @@ from sklearn.model_selection import train_test_split
 from utils.fen_to_array import fen_to_array, fens_to_arrays
 from utils.log_loss_csv import write_train, write_validation
 from utils.model_files import create_model_state_folder
-from utils.numpy_array_files import get_saved_array, preprocessed_state_exists, save_sub_array
+from utils.numpy_array_files import get_saved_arrays, preprocessed_state_exists, save_arrays
 
 class ChessHeuristicDataset(Dataset):
     def __init__(self, features, targets):
@@ -91,8 +91,7 @@ OPTIMIZER = torch.optim.AdamW(model.parameters(), lr=INITIAL_LEARNING_RATE, weig
 SCHEDULER = lr_schedulers.StepLR(OPTIMIZER, step_size=5, gamma=0.5)
 LOSS_FN = torch.nn.MSELoss()
 MODEL_PATH = "model_states/chess_heuristic_evaluator"
-DATASET_TRAIN_PATH = "preprocessed_data/chess_heuristic_evaluator_train_dataset"
-DATASET_TEST_PATH = "preprocessed_data/chess_heuristic_evaluator_test_dataset"
+PREPROCESSED_DATA_PATH = "preprocessed_data/data_split"
 
 def pre_process_df(df: polars.DataFrame):
     print("Normalizing Final Evaluation")
@@ -116,7 +115,7 @@ def normalize_split_data(X: np.ndarray, y: np.ndarray):
     return X_train, X_test, y_train, y_test
 
 def pre_process_data():
-    if preprocessed_state_exists(DATASET_TRAIN_PATH, DATASET_TEST_PATH, CHUNKS) == False:
+    if preprocessed_state_exists(PREPROCESSED_DATA_PATH, CHUNKS) == False:
         print("Getting dataset")
         abs_path = kagglehub.dataset_download("mateuszgrzybpl/lichess-chess-positions-ml-ready-and-deduplicated")
         for i in range(CHUNKS):
@@ -126,7 +125,7 @@ def pre_process_data():
             print("Preprocessing dataset")
             arrs = pre_process_df(df=df)
             del df
-            save_sub_array(DATASET_TRAIN_PATH, DATASET_TEST_PATH, i, arrs[0], arrs[1], arrs[2], arrs[3])
+            save_arrays(PREPROCESSED_DATA_PATH, i, arrs[0], arrs[1], arrs[2], arrs[3])
             del arrs
     else:
         print("Preprocessing skipped, using saved normalization")
@@ -175,14 +174,13 @@ def train():
         avg_vloss = 0.0
         for j in range(CHUNKS):
             print(f'CHUNK {j + 1}:')
-            X, y = get_saved_array(DATASET_TRAIN_PATH, j)
-            ds = create_dataset(X, y)
+            X_train, y_train, X_test, y_test = get_saved_arrays(PREPROCESSED_DATA_PATH, j)
+            ds = create_dataset(X_train, y_train)
             train_dl = create_dataloader(ds, shuffle=True)
             model.train(True)
             avg_tloss += train_one_epoch(epoch, j, train_dl)
             running_vloss = 0.0
-            X, y = get_saved_array(DATASET_TEST_PATH, j)
-            ds = create_dataset(X, y)
+            ds = create_dataset(X_test, y_test)
             test_dl = create_dataloader(ds, shuffle=False)
             model.eval()
             with torch.no_grad():
