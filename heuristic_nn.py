@@ -65,7 +65,6 @@ class ChessHeuristicEvaluator(nn.Module):
         )
         self.heuristic = nn.Sequential(
             nn.Flatten(),
-            nn.Dropout(p=0.2),
             nn.Linear(128 * 8**2 + 14 * 8**2, 4096),
             nn.ReLU(),
             nn.Dropout(p=0.2),
