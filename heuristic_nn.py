@@ -65,13 +65,16 @@ class ChessHeuristicEvaluator(nn.Module):
         )
         self.heuristic = nn.Sequential(
             nn.Flatten(),
-            nn.Dropout(p=0.5),
-            nn.Linear(128 * 8**2 + 14 * 8**2, 256),
+            nn.Linear(128 * 8**2 + 14 * 8**2, 4096),
             nn.ReLU(),
-            nn.Dropout(p=0.5),
-            nn.Linear(256, 16),
+            nn.Dropout(p=0.2),
+            nn.Linear(4096, 1024),
             nn.ReLU(),
-            nn.Linear(16, 1),
+            nn.Dropout(p=0.2),
+            nn.Linear(1024, 256),
+            nn.ReLU(),
+            nn.Dropout(p=0.2),
+            nn.Linear(256, 1),
             nn.Tanh()
         )
     def forward(self, x):
