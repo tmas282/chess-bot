@@ -90,7 +90,7 @@ EPOCHS = 20
 CHUNKS = 10
 INITIAL_LEARNING_RATE = 0.001
 BATCH_SIZE = 1024
-OPTIMIZER = torch.optim.AdamW(model.parameters(), lr=INITIAL_LEARNING_RATE, weight_decay=0.001)
+OPTIMIZER = torch.optim.AdamW(model.parameters(), lr=INITIAL_LEARNING_RATE, weight_decay=0.0001)
 SCHEDULER = lr_schedulers.StepLR(OPTIMIZER, step_size=5, gamma=0.5)
 LOSS_FN = torch.nn.MSELoss()
 MODEL_PATH = "model_states/chess_heuristic_evaluator"
