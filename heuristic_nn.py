@@ -73,8 +73,7 @@ class ChessHeuristicEvaluator(nn.Module):
             nn.Dropout(p=0.2),
             nn.Linear(1024, 256),
             nn.ReLU(),
-            nn.Linear(256, 1),
-            nn.Tanh()
+            nn.Linear(256, 1)
         )
     def forward(self, x):
         res_conv1 = self.conv1(x)
