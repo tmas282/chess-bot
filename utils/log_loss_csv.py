@@ -32,16 +32,16 @@ def plot():
     plt.figure(figsize=(10, 6))
 
     if 'tloss' in df_train.columns and df_train.height > 0:
-        plt.plot(range(df_train.height), df_train['tloss'] / 1000, label='Treino', color='royalblue', alpha=0.6)
+        plt.plot(range(df_train.height), df_train['tloss'] / 1000, label='Training', color='royalblue', alpha=0.6)
 
     if 'vloss' in df_val.columns and df_val.height > 0:
         if df_train.height > 0:
             scale = df_train.height / df_val.height
             val_x = [i * scale for i in range(df_val.height)]
-            plt.plot(val_x, df_val['vloss'], label='Validação', color='crimson', marker='o', linewidth=2)
+            plt.plot(val_x, df_val['vloss'], label='Validation', color='crimson', marker='o', linewidth=2)
 
-    plt.title('Curva de Aprendizagem - Loss de Treino e Validação')
-    plt.xlabel('Passos')
+    plt.title('Learning Curve - Training & Validation')
+    plt.xlabel('Steps')
     plt.ylabel('Loss')
     plt.legend()
     plt.grid(True, linestyle='--', alpha=0.5)

@@ -70,15 +70,3 @@ To hop inside the container and manually interact with the files, run tests, or 
 docker run --gpus all -it chess-bot /bin/bash
 ```
 Once inside the shell, the virtual environment is already loaded into your PATH, so you can run Python scripts directly (e.g., python your_script.py).
-
-<br/>
-
----
-
-<br/>
-
-> **💡 Important Project Note**
->
-> **The core architecture, engine integration, training logic, and game-playing algorithms of this repository were designed and written entirely by hand without AI assistance.**
-> 
-> AI tools were utilized **exclusively** for structuring this documentation (`README.md`) and configuring the `uv` virtual environment setup. This strict separation was maintained to guarantee a genuine, ground-up learning experience of PyTorch and foundational machine learning principles.

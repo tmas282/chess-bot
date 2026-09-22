@@ -1,0 +1,17 @@
+{
+  "version": "2.0.0",
+  "configurations": [
+    {
+      "name": "C Debug -> Makefile",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/chess_bot",
+      "args": [],
+      "stopAtEntry": true,
+      "cwd": "${workspaceFolder}",
+      "environment": [],
+      "externalConsole": false,
+      "preLaunchTask": "make"
+    }
+  ]
+}

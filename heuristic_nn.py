@@ -1,3 +1,5 @@
+from functools import lru_cache
+
 import kagglehub
 import numpy as np
 import polars
@@ -217,7 +219,15 @@ def start_training():
 if __name__ == "__main__":
     start_training()
 
-def use_model():
-    create_model_state_folder()
+@lru_cache
+def load_model():
     model = ChessHeuristicEvaluator()
     model.load_state_dict(torch.load(MODEL_PATH))
+    return model.to(DEVICE)
+
+def use_model(fen: str):
+    model = load_model()
+    x = torch.tensor(fen_to_array(fen), dtype=torch.float32).reshape((1,14,8,8)).to(DEVICE)
+    y = model.forward(x)
+    y = torch.clone(y).detach().cpu()
+    return y
