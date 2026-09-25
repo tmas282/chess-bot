@@ -220,3 +220,4 @@ __marimo__/
 # C Binaries
 chess_bot
 chess_test
+.aider*
