@@ -216,7 +216,3 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
-
-# C Binaries
-chess_bot
-chess_test
