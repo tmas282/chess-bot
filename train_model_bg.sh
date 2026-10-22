@@ -1,5 +1,15 @@
 #!/bin/bash
 
-rm bot_output.log
-nohup stdbuf -oL -eL python3 -u heuristic_nn.py >> bot_output.log 2>&1 &
-tail -f bot_output.log
+LOG_FILE="bot_output.log"
+
+rm -f "$LOG_FILE"
+
+nohup uv run python -u -m agent.train > "$LOG_FILE" 2>&1 &
+
+PID=$!
+echo "Training started in background with PID: $PID"
+echo "Log file: $LOG_FILE"
+echo "To monitor logs in real-time, run:"
+echo "  tail -f $LOG_FILE"
+echo "To stop training, run:"
+echo "  kill $PID"
