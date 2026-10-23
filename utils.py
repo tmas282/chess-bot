@@ -13,37 +13,47 @@ def moving_average(data, window_size=20):
 
 
 def plot_training_metrics(rewards, a2c_losses, window_size=20, save_path="training_curves.png"):
-    episodes = range(1, len(rewards) + 1)
-    
-    _, axes = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
+    if len(a2c_losses) == 0 and len(rewards) == 0:
+        print("No metrics recorded to plot.")
+        return
+
+    fig, axes = plt.subplots(2, 1, figsize=(10, 8))
     plt.style.use("seaborn-v0_8-whitegrid" if "seaborn-v0_8-whitegrid" in plt.style.available else "default")
 
     # 1. Episode Rewards
-    axes[0].plot(episodes, rewards, alpha=0.3, color="green", label="Raw Reward")
-    if len(rewards) >= window_size:
-        smooth_rewards = moving_average(rewards, window_size)
-        axes[0].plot(range(window_size, len(rewards) + 1), smooth_rewards, color="green", linewidth=2, label=f"MA ({window_size})")
-    axes[0].set_ylabel("Reward")
-    axes[0].set_title("Training Metrics")
-    axes[0].legend(loc="upper left")
-    axes[0].grid(True, linestyle="--", alpha=0.6)
+    if len(rewards) > 0:
+        episodes_r = range(1, len(rewards) + 1)
+        axes[0].plot(episodes_r, rewards, alpha=0.3, color="green", label="Raw Reward")
+        if len(rewards) >= window_size:
+            smooth_rewards = moving_average(rewards, window_size)
+            axes[0].plot(range(window_size, len(rewards) + 1), smooth_rewards, color="green", linewidth=2, label=f"MA ({window_size})")
+        axes[0].set_ylabel("Reward")
+        axes[0].set_xlabel("Completed Games")
+        axes[0].set_title("Training Metrics")
+        axes[0].legend(loc="upper left")
+        axes[0].grid(True, linestyle="--", alpha=0.6)
+    else:
+        axes[0].text(0.5, 0.5, "No games completed yet", ha="center", va="center")
+        axes[0].set_ylabel("Reward")
+        axes[0].set_title("Training Metrics")
 
     # 2. A2C Loss
-    axes[1].plot(episodes, a2c_losses, alpha=0.3, color="red", label="Raw A2C Loss")
-    if len(a2c_losses) >= window_size:
-        smooth_a2c = moving_average(a2c_losses, window_size)
-        axes[1].plot(range(window_size, len(a2c_losses) + 1), smooth_a2c, color="red", linewidth=2, label=f"MA ({window_size})")
-    axes[1].set_ylabel("A2C Loss")
-    axes[1].set_xlabel("Episode")
-    axes[1].legend(loc="upper left")
-    axes[1].grid(True, linestyle="--", alpha=0.6)
+    if len(a2c_losses) > 0:
+        updates_l = range(1, len(a2c_losses) + 1)
+        axes[1].plot(updates_l, a2c_losses, alpha=0.3, color="red", label="Raw A2C Loss")
+        if len(a2c_losses) >= window_size:
+            smooth_a2c = moving_average(a2c_losses, window_size)
+            axes[1].plot(range(window_size, len(a2c_losses) + 1), smooth_a2c, color="red", linewidth=2, label=f"MA ({window_size})")
+        axes[1].set_ylabel("A2C Loss")
+        axes[1].set_xlabel("Update Step")
+        axes[1].legend(loc="upper left")
+        axes[1].grid(True, linestyle="--", alpha=0.6)
 
     plt.tight_layout()
-    
     if save_path:
         plt.savefig(save_path, dpi=300)
-        print(f"Plot saved to {save_path}")
-    plt.show()
+        print(f"--> Plot saved successfully to: {save_path}")
+    plt.close(fig)
 
 
 def save_checkpoint(
