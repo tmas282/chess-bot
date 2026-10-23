@@ -79,10 +79,10 @@ class SubprocVectorChessEnv:
             try:
                 if p.is_alive():
                     p.terminate()
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"Exception {e}")
         for remote in self.remotes:
             try:
                 remote.close()
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"Exception {e}")

@@ -21,10 +21,10 @@ TOTAL_UPDATES = 1_000_000
 # 
 # For a good CPU+GPU:
 # TOTAL_UPDATES = 500_000
-# NUM_ENVS = 8
-# Batch size is 1024
+# NUM_ENVS = 16
+# Batch size is 2048
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+CHECKPOINT_THRESHOLD = 500
 
 def train():
     actor = actor_vit.ActorViT(embed_dim=256, depth=4).to(DEVICE).to(torch.bfloat16)
@@ -138,6 +138,8 @@ def train():
             print(f"Update {update}: A2C loss: {float(a2c_loss):.4f} / Steps Per Second: {batch_sps:.1f}")
             a2c_loss_info.append(float(a2c_loss))
 
+            if update % CHECKPOINT_THRESHOLD != 0:
+                continue
             save_checkpoint(
                 episode=update,
                 actor=actor,
@@ -163,7 +165,10 @@ def train():
         vec_env.close()
         if len(a2c_loss_info) > 0:
             print("Plotting training metrics...")
-            plot_training_metrics(all_rewards, a2c_loss_info)
+            try:
+                plot_training_metrics(all_rewards, a2c_loss_info, save_path="training_curves.png")
+            except Exception as e:
+                print(f"[ERROR] Failed to generate plot: {e}")
         else:
             print("No updates completed yet, nothing to plot.")
 

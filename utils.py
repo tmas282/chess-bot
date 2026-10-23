@@ -1,5 +1,8 @@
 import os
 
+import matplotlib
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -52,7 +55,7 @@ def plot_training_metrics(rewards, a2c_losses, window_size=20, save_path="traini
     plt.tight_layout()
     if save_path:
         plt.savefig(save_path, dpi=300)
-        print(f"--> Plot saved successfully to: {save_path}")
+        print(f"--> Plot saved successfully to: {os.path.abspath(save_path)}")
     plt.close(fig)
 
 
@@ -72,7 +75,7 @@ def save_checkpoint(
     os.makedirs(save_dir, exist_ok=True)
     if filename is None:
         filename = f"checkpoint_ep_{episode}.pt"
-    
+
     filepath = os.path.join(save_dir, filename)
 
     checkpoint = {
@@ -85,7 +88,7 @@ def save_checkpoint(
         checkpoint["optimizer_state_dict"] = optimizer.state_dict()
 
     torch.save(checkpoint, filepath)
-    print(f"--> Checkpoint saved to: {filepath}")
+    print(f"--> Checkpoint saved to: {os.path.abspath(filepath)}")
     return filepath
 
 
