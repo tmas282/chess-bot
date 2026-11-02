@@ -37,7 +37,7 @@ class ValueIterationAgent:
         if hasattr(self.model, "reset_noise") and isinstance(self.model, ValueViT):
             self.model.reset_noise()
 
-    @torch.no_grad()
+    @torch.inference_mode()
     def evaluate_state(self, env: ChessEnvironment) -> float:
         """
         Evaluates the current state of the environment, returning its White-centric value in [-1.0, 1.0].
@@ -50,7 +50,7 @@ class ValueIterationAgent:
         value = self.model(tensor).item()
         return float(value)
 
-    @torch.no_grad()
+    @torch.inference_mode()
     def evaluate_successors(
         self,
         env: ChessEnvironment,
@@ -61,7 +61,7 @@ class ValueIterationAgent:
         batch_results = self.evaluate_successors_batch([env])
         return batch_results[0]
 
-    @torch.no_grad()
+    @torch.inference_mode()
     def evaluate_successors_batch(
         self,
         envs: list[ChessEnvironment],
@@ -91,7 +91,7 @@ class ValueIterationAgent:
             board = env.board
             for m_idx, move in enumerate(moves):
                 board.push(move)
-                is_term, term_val = env.get_outcome(claim_draw=True)
+                is_term, term_val = env.get_outcome()
                 if is_term:
                     vals[m_idx] = term_val
                 else:

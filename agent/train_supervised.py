@@ -174,7 +174,7 @@ def train():
         # Validation
         model.eval()
         val_loss_total = 0.0
-        with torch.no_grad():
+        with torch.inference_mode():
             for states, targets_batch in val_loader:
                 states = states.to(DEVICE, non_blocking=True)
                 targets_batch = targets_batch.to(DEVICE, non_blocking=True)
