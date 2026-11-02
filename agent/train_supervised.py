@@ -16,7 +16,7 @@ from utils import get_device, save_checkpoint
 # =============================================================================
 # Hyperparameters
 # =============================================================================
-BATCH_SIZE = 512
+BATCH_SIZE = 2048
 LEARNING_RATE = 3e-4
 WEIGHT_DECAY = 0.01
 EPOCHS = 5
