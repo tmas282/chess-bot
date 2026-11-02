@@ -1,172 +1,174 @@
+import collections
+import os
+import random
 import time
 
+import chess
 import torch
+from torch import nn
 
-from agent import actor_vit, critic_vit
-from agent.loss_func import A2CombinedLoss
-from agent.vec_env import SubprocVectorChessEnv
-from utils import plot_training_metrics, save_checkpoint
+from agent.environment import ChessEnvironment
+from agent.value_agent import ValueIterationAgent
+from agent.value_vit import ValueViT
+from utils import get_device, load_checkpoint, plot_training_metrics, save_checkpoint
 
 # Hyperparameters
+# Total transitions collected = TOTAL_UPDATES * ROLLOUT_STEPS_PER_UPDATE * NUM_PARALLEL_GAMES
+# Approximate games played = (Total transitions) / ~60 moves per game
 LEARNING_RATE = 1e-4
+WEIGHT_DECAY = 0.001
 GAMMA = 0.99
-ENTROPY_COEFF = 0.01
-BETA_CRITIC_WEIGHT = 1.0
-NUM_ENVS = 4 # Number of parallel environments running on CPU cores
-ROLLOUT_STEPS = 128 # Steps per env before training (Batch size = 4 * 128 = 512)
-TOTAL_UPDATES = 1_000_000
-# Train 4 million games Math:
-# TOTAL_UPDATES * NUM_ENVS
-# Obs: assuming one environment is roughly one game
-# 
-# For a good CPU+GPU:
-# TOTAL_UPDATES = 500_000
-# NUM_ENVS = 16
-# Batch size is 2048
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-CHECKPOINT_THRESHOLD = 500
+NUM_PARALLEL_GAMES = 4
+REPLAY_BUFFER_CAPACITY = 10_000
+MIN_REPLAY_SIZE = 512
+BATCH_SIZE = 512
+ROLLOUT_STEPS_PER_UPDATE = 200
+TOTAL_UPDATES = 600_000
+CHECKPOINT_INTERVAL = 250
+LOG_INTERVAL = 10
+DEVICE = get_device()
+
 
 def train():
-    actor = actor_vit.ActorViT(embed_dim=256, depth=4).to(DEVICE).to(torch.bfloat16)
-    critic = critic_vit.CriticViT(embed_dim=256, depth=4).to(DEVICE).to(torch.bfloat16)
+    print(f"Initializing ValueViT model on {DEVICE} (bfloat16)...")
+    value_vit = ValueViT().to(DEVICE).to(torch.bfloat16)
 
-    optim = torch.optim.AdamW(
-        list(actor.parameters()) + list(critic.parameters()),
-        weight_decay=0.01,
+    supervised_checkpoint = os.path.join("checkpoints", "checkpoint_supervised_final.pt")
+    if os.path.isfile(supervised_checkpoint):
+        print(f"Loading pretrained supervised weights from: {supervised_checkpoint}")
+        load_checkpoint(supervised_checkpoint, value_net=value_vit, device=DEVICE)
+
+    agent = ValueIterationAgent(model=value_vit, device=DEVICE, dtype=torch.bfloat16)
+
+    optimizer = torch.optim.AdamW(
+        value_vit.parameters(),
         lr=LEARNING_RATE,
+        weight_decay=WEIGHT_DECAY,
     )
-    a2c_loss_fn = A2CombinedLoss(ENTROPY_COEFF, BETA_CRITIC_WEIGHT).to(DEVICE).to(torch.bfloat16)
+    loss_fn = nn.MSELoss()
+
+    replay_buffer = collections.deque(maxlen=REPLAY_BUFFER_CAPACITY)
+
+    envs = [ChessEnvironment(device="cpu", dtype=torch.bfloat16) for _ in range(NUM_PARALLEL_GAMES)]
+    trajectories: list[list[tuple[torch.Tensor, chess.Color]]] = [[] for _ in range(NUM_PARALLEL_GAMES)]
 
     all_rewards = []
-    a2c_loss_info = []
+    value_losses = []
+    white_wins = 0
+    black_wins = 0
+    draws = 0
+    total_games = 0
+    update = 0
+    loss_val = None
+
+    print(f"Starting {NUM_PARALLEL_GAMES} parallel self-play environments for Value Iteration RL...")
     batch_start_time = time.perf_counter()
-    batch_steps = 0
-
-    print(f"Starting {NUM_ENVS} parallel environments across CPU cores...")
-    vec_env = SubprocVectorChessEnv(num_envs=NUM_ENVS)
-
-    states, masks = vec_env.reset_all()
-    states = states.to(DEVICE).to(torch.bfloat16)
-    masks = masks.to(DEVICE).to(torch.bool)
-    is_whites = [True] * NUM_ENVS
+    collected_steps = 0
 
     try:
         for update in range(1, TOTAL_UPDATES + 1):
-            batch_states = []
-            batch_actions = []
-            batch_masks = []
-            batch_rewards = []
-            batch_dones = []
+            # 1. Self-Play Rollout Phase
+            value_vit.train()  # Keep train mode enabled so NoisyLinear samples parameter noise
+            for _ in range(ROLLOUT_STEPS_PER_UPDATE):
+                # Record pre-transition state tensors
+                for i, env in enumerate(envs):
+                    trajectories[i].append((env.get_state_tensor(), env.board.turn))
 
-            # Rollout Phase
-            with torch.no_grad():
-                for _ in range(ROLLOUT_STEPS):
-                    logits = actor(states)
-                    masked_logits = logits.masked_fill(~masks, -1e2)
+                # Batch action selection via ValueIterationAgent
+                actions = agent.select_actions_batch(envs)
 
-                    actions_distribution = torch.distributions.Categorical(logits=masked_logits)
-                    actions = actions_distribution.sample()
+                # Step environments
+                for i, env in enumerate(envs):
+                    _, reward, terminated, truncated = env.step(actions[i])
+                    collected_steps += 1
 
-                    next_states, rewards, terms, truncs, next_masks = vec_env.step(
-                        actions.tolist(), is_whites
-                    )
-
-                    dones = [t or tr for t, tr in zip(terms, truncs)]
-
-                    batch_states.append(states)
-                    batch_actions.append(actions)
-                    batch_masks.append(masks)
-                    batch_rewards.append(torch.tensor(rewards, device=DEVICE, dtype=torch.bfloat16))
-                    batch_dones.append(torch.tensor(dones, device=DEVICE, dtype=torch.bool))
-
-                    # Auto-reset any finished games
-                    next_states_list = []
-                    next_masks_list = []
-                    for i in range(NUM_ENVS):
-                        if dones[i]:
-                            all_rewards.append(rewards[i])
-                            st, mk = vec_env.reset_one(i)
-                            next_states_list.append(st)
-                            next_masks_list.append(mk)
-                            is_whites[i] = True
+                    if terminated or truncated:
+                        if terminated:
+                            outcome_z = reward
                         else:
-                            next_states_list.append(next_states[i])
-                            next_masks_list.append(next_masks[i])
-                            is_whites[i] = not is_whites[i]
+                            outcome_z = agent.evaluate_state(env)
 
-                    states = torch.stack(next_states_list).to(DEVICE).to(torch.bfloat16)
-                    masks = torch.stack(next_masks_list).to(DEVICE).to(torch.bool)
-                    batch_steps += NUM_ENVS
+                        # Backward Bellman target assignment: y_t = z * gamma^(T - t)
+                        traj = trajectories[i]
+                        running_target = outcome_z
+                        for t in reversed(range(len(traj))):
+                            st_tensor, _ = traj[t]
+                            replay_buffer.append((st_tensor, running_target))
+                            running_target *= GAMMA
 
-                # Compute Qvals backwards across all parallel envs
-                running_q = critic(states).squeeze(-1)
-                qvals = torch.zeros((ROLLOUT_STEPS, NUM_ENVS), device=DEVICE, dtype=torch.bfloat16)
-                for t in reversed(range(ROLLOUT_STEPS)):
-                    running_q = batch_rewards[t] + GAMMA * running_q * (~batch_dones[t])
-                    qvals[t] = running_q
+                        all_rewards.append(outcome_z)
+                        total_games += 1
+                        if outcome_z > 0.5:
+                            white_wins += 1
+                        elif outcome_z < -0.5:
+                            black_wins += 1
+                        else:
+                            draws += 1
 
-            # Training Phase
-            
-            batch_states_t = torch.cat(batch_states, dim=0)
-            batch_actions_t = torch.cat(batch_actions, dim=0)
-            batch_masks_t = torch.cat(batch_masks, dim=0)
-            Qvals = qvals.view(-1, 1)
+                        env.reset()
+                        trajectories[i] = []
 
-            actor.train()
-            critic.train()
-
-            logits = actor(batch_states_t)
-            values = critic(batch_states_t)
-
-            masked_logits = logits.masked_fill(~batch_masks_t, -1e2)
-            dist = torch.distributions.Categorical(logits=masked_logits)
-            batch_actions_logs_probs = dist.log_prob(batch_actions_t)
-
-            a2c_loss = a2c_loss_fn(batch_actions_logs_probs, Qvals, values, dist.entropy().sum())
-
-            optim.zero_grad(set_to_none=True)
-            a2c_loss.backward()
-            optim.step()
-
-            # Logging & Checkpointing
-            now = time.perf_counter()
-            elapsed_batch = now - batch_start_time
-            batch_sps = batch_steps / elapsed_batch if elapsed_batch > 0 else 0
-            batch_start_time = time.perf_counter()
-            batch_steps = 0
-
-            print(f"Update {update}: A2C loss: {float(a2c_loss):.4f} / Steps Per Second: {batch_sps:.1f}")
-            a2c_loss_info.append(float(a2c_loss))
-
-            if update % CHECKPOINT_THRESHOLD != 0:
+            # Value Iteration
+            if len(replay_buffer) < MIN_REPLAY_SIZE:
                 continue
-            save_checkpoint(
-                episode=update,
-                actor=actor,
-                critic=critic,
-                optimizer=optim,
-                loss=float(a2c_loss),
-                save_dir="checkpoints",
+
+            samples = random.sample(replay_buffer, BATCH_SIZE)
+            states_batch = torch.stack([s[0] for s in samples]).to(DEVICE).to(torch.bfloat16)
+            targets_batch = (
+                torch.tensor([s[1] for s in samples], device=DEVICE, dtype=torch.bfloat16)
+                .unsqueeze(1)
             )
 
+            value_vit.train()
+            value_vit.reset_noise()
+            preds = value_vit(states_batch)
+            loss = loss_fn(preds, targets_batch)
+
+            optimizer.zero_grad(set_to_none=True)
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(value_vit.parameters(), max_norm=1.0)
+            optimizer.step()
+
+            loss_val = float(loss.item())
+            value_losses.append(loss_val)
+
+            # Logging
+            if update % LOG_INTERVAL == 0:
+                elapsed = time.perf_counter() - batch_start_time
+                sps = collected_steps / elapsed if elapsed > 0 else 0
+                batch_start_time = time.perf_counter()
+                collected_steps = 0
+
+                print(
+                    f"Update {update:6d} | Loss: {loss_val:.4f} | Games: {total_games:4d} "
+                    f"(W:{white_wins} B:{black_wins} D:{draws}) | Steps/s: {sps:5.1f} | Buffer: {len(replay_buffer):5d}"
+                )
+
+            if update % CHECKPOINT_INTERVAL == 0:
+                save_checkpoint(
+                    episode=update,
+                    value_net=value_vit,
+                    optimizer=optimizer,
+                    loss=loss_val,
+                    save_dir="checkpoints",
+                )
+
     except KeyboardInterrupt:
-        print("\n[!] Training stopped via Ctrl+C. Saving safety checkpoint...")
+        print("\n[!] Training stopped via KeyboardInterrupt. Saving checkpoint...")
         save_checkpoint(
-            episode=update if "update" in locals() else 0,
-            actor=actor,
-            critic=critic,
-            optimizer=optim,
-            loss=float(a2c_loss) if "a2c_loss" in locals() else None,
+            episode=update,
+            value_net=value_vit,
+            optimizer=optimizer,
+            loss=loss_val,
             save_dir="checkpoints",
             filename="checkpoint_interrupted.pt",
         )
     finally:
-        print("\n[Shutdown] Cleaning up worker processes...")
-        vec_env.close()
-        if len(a2c_loss_info) > 0:
+        print("\nTraining session ended.")
+        if len(value_losses) > 0:
             print("Plotting training metrics...")
             try:
-                plot_training_metrics(all_rewards, a2c_loss_info, save_path="training_curves.png")
+                plot_training_metrics(all_rewards, value_losses, save_path="training_curves.png")
             except Exception as e:
                 print(f"[ERROR] Failed to generate plot: {e}")
         else:

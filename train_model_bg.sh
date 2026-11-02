@@ -1,18 +1,12 @@
 #!/bin/bash
-
-# Ensure script runs from the repository root
 cd "$(dirname "$0")"
 
-LOG_FILE="bot_output.log"
+case "${1:-all}" in
+  supervised) CMD="uv run python -u -m agent.train_supervised" ;;
+  rl)         CMD="uv run python -u -m agent.train_rl" ;;
+  all)        CMD="uv run python -u -m agent.train_supervised && uv run python -u -m agent.train_rl" ;;
+  *)          echo "Usage: $0 [all|supervised|rl]"; exit 1 ;;
+esac
 
-rm -f "$LOG_FILE"
-
-nohup uv run python -u -m agent.train_rl > "$LOG_FILE" 2>&1 &
-
-PID=$!
-echo "Training started in background with PID: $PID"
-echo "Log file: $LOG_FILE"
-echo "To monitor logs in real-time, run:"
-echo "  tail -f $LOG_FILE"
-echo "To stop training, run:"
-echo "  kill $PID"
+nohup bash -c "$CMD" > bot_output.log 2>&1 &
+echo "Started ${1:-all} training (PID: $!). Logs: tail -f bot_output.log"
