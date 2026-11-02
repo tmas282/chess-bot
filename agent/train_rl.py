@@ -15,15 +15,15 @@ from utils import get_device, load_checkpoint, plot_training_metrics, save_check
 # Hyperparameters
 # Total transitions collected = TOTAL_UPDATES * ROLLOUT_STEPS_PER_UPDATE * NUM_PARALLEL_GAMES
 # Approximate games played = (Total transitions) / ~60 moves per game
-LEARNING_RATE = 1e-4
+LEARNING_RATE = 1.5e-4
 WEIGHT_DECAY = 0.001
 GAMMA = 0.99
-NUM_PARALLEL_GAMES = 128
-REPLAY_BUFFER_CAPACITY = 20_000
-MIN_REPLAY_SIZE = 1024
-BATCH_SIZE = 1024
+NUM_PARALLEL_GAMES = 256
+REPLAY_BUFFER_CAPACITY = 80_000
+MIN_REPLAY_SIZE = 4096
+BATCH_SIZE = 4096
 ROLLOUT_STEPS_PER_UPDATE = 8
-TOTAL_UPDATES = 150_000
+TOTAL_UPDATES = 50_000
 CHECKPOINT_INTERVAL = 250
 LOG_INTERVAL = 10
 DEVICE = get_device()
